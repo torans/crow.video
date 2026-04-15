@@ -9,9 +9,22 @@ import {
   SelectFolderParams,
   StatEventParams,
 } from './types'
-import { edgeTtsGetVoiceList, edgeTtsSynthesizeToBase64, edgeTtsSynthesizeToFile } from './tts'
+import { ttsSynthesizeToUrl, ttsSynthesizeToFile } from './tts'
 import { renderVideo } from './ffmpeg'
 import { sendStatEvent } from './lib/stat'
+import { testVLConnection } from './vl'
+import { analyzeVideoAssets, clearVideoAnalysis } from './vl/analyze-video'
+import {
+  analyzeProductReference,
+  saveProductReference,
+  updateProductReference,
+  getProductReferences,
+  getProductReferenceById,
+  deleteProductReference,
+  updateProductReferenceAnalysis,
+} from './vl/analyze-product'
+import { matchVideoSegments, getAnalysisStats } from './vl/match'
+import type { VLApiConfig } from './vl/types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
 
@@ -100,7 +113,7 @@ export default function initIPC() {
   ipcMain.on('win-max', (event) => {
     const win = BrowserWindow.fromWebContents(event.sender)
     if (win?.isMaximized()) {
-      win?.restore()
+      win?.unmaximize()
     } else {
       win?.maximize()
     }
@@ -154,19 +167,12 @@ export default function initIPC() {
       }))
   })
 
-  // 获取EdgeTTS语音列表
-  ipcMain.handle('edge-tts-get-voice-list', () => edgeTtsGetVoiceList())
+  // 语音合成（Qwen TTS）
+  ipcMain.handle('tts-synthesize-to-url', (_event, params) => ttsSynthesizeToUrl(params))
+  ipcMain.handle('tts-synthesize-to-file', (_event, params) => ttsSynthesizeToFile(params))
 
   // 统计事件上报
   ipcMain.handle('stat-track', (_event, params: StatEventParams) => sendStatEvent(params))
-
-  // 语音合成并获取Base64
-  ipcMain.handle('edge-tts-synthesize-to-base64', (_event, params) =>
-    edgeTtsSynthesizeToBase64(params),
-  )
-
-  // 保存语音合成到文件
-  ipcMain.handle('edge-tts-synthesize-to-file', (_event, params) => edgeTtsSynthesizeToFile(params))
 
   // 渲染视频
   ipcMain.handle('render-video', (_event, params) => {
@@ -183,5 +189,115 @@ export default function initIPC() {
     })
 
     return renderVideo({ ...params, onProgress, abortSignal: controller.signal })
+  })
+
+  // === VL 视觉大模型相关 ===
+
+  // 测试 VL API 连接
+  ipcMain.handle('vl-test-connection', (_event, params: VLApiConfig) => {
+    return testVLConnection(params)
+  })
+
+  // 分析素材库视频
+  ipcMain.handle('vl-analyze-video-assets', (_event, params: { videoPaths: string[]; apiConfig: VLApiConfig; intervalSeconds?: number }) => {
+    const controller = new AbortController()
+
+    ipcMain.once('vl-cancel-analysis', () => {
+      controller.abort()
+    })
+
+    const onProgress = (current: number, total: number) => {
+      _event.sender.send('vl-analysis-progress', { current, total })
+    }
+
+    return analyzeVideoAssets({
+      ...params,
+      onProgress,
+      abortSignal: controller.signal,
+    })
+  })
+
+  // 取消分析（由渲染进程发送）
+  // 实际取消逻辑通过 ipcMain.once('vl-cancel-analysis') 在上方处理
+
+  // 清除视频分析数据
+  ipcMain.handle('vl-clear-video-analysis', (_event, params?: { videoPath?: string }) => {
+    return clearVideoAnalysis(params?.videoPath)
+  })
+
+  // 获取分析统计
+  ipcMain.handle('vl-get-analysis-stats', (_event, params: { videoPaths: string[] }) => {
+    return getAnalysisStats(params.videoPaths)
+  })
+
+  // 智能匹配选片
+  ipcMain.handle('vl-match-video-segments', (_event, params) => {
+    return matchVideoSegments(params)
+  })
+
+  // === 产品参考管理 ===
+
+  // 分析产品参考图片
+  ipcMain.handle('vl-analyze-product-reference', (_event, params: { imagePaths: string[]; apiConfig: VLApiConfig }) => {
+    return analyzeProductReference(params)
+  })
+
+  // 保存产品参考
+  ipcMain.handle('vl-save-product-reference', async (_event, params) => {
+    try {
+      return await saveProductReference(params)
+    } catch (e) {
+      console.error('vl-save-product-reference error:', e)
+      throw e
+    }
+  })
+
+  // 更新产品参考
+  ipcMain.handle('vl-update-product-reference', async (_event, params: { id: string; name: string; imagePaths: string[]; features: string; highlights: string; targetAudience: string }) => {
+    try {
+      return await updateProductReference(params.id, params)
+    } catch (e) {
+      console.error('vl-update-product-reference error:', e)
+      throw e
+    }
+  })
+
+  // 更新产品视觉分析结果
+  ipcMain.handle('vl-update-product-analysis', (_event, params: { id: string; analysis: { description: string; colors: string[]; tags: string[] } }) => {
+    return updateProductReferenceAnalysis(params.id, params.analysis)
+  })
+
+  // 获取所有产品参考
+  ipcMain.handle('vl-get-product-references', () => {
+    return getProductReferences()
+  })
+
+  // 获取单个产品参考
+  ipcMain.handle('vl-get-product-reference-by-id', (_event, params: { id: string }) => {
+    return getProductReferenceById(params.id)
+  })
+
+  // 删除产品参考
+  ipcMain.handle('vl-delete-product-reference', (_event, params: { id: string }) => {
+    return deleteProductReference(params.id)
+  })
+
+  // 选择图片文件（用于产品参考上传）
+  ipcMain.handle('select-images', async (event, params?: { title?: string }) => {
+    const win = BrowserWindow.fromWebContents(event.sender)
+    if (!win) {
+      throw new Error('无法获取窗口')
+    }
+
+    const result = await dialog.showOpenDialog(win, {
+      properties: ['openFile', 'multiSelections'],
+      title: params?.title || '选择产品图片',
+      filters: [{ name: '图片', extensions: ['jpg', 'jpeg', 'png', 'webp', 'bmp'] }],
+    })
+
+    if (!result.canceled && result.filePaths.length > 0) {
+      return result.filePaths.map((p) => p.replace(/\\/g, '/'))
+    }
+    return []
   })
 }

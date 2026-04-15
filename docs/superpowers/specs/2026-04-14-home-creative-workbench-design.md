@@ -19,6 +19,7 @@ The user explicitly requested:
 - Preserve the three-column information architecture.
 - Use a higher-end "creative console" style instead of a settings-page style.
 - Treat the **left column as the main stage**.
+- Do not mix Chinese and English in visible UI copy unless a term is effectively untranslated, such as a product name, brand name, or unavoidable technical term.
 
 ## Design Direction
 
@@ -131,6 +132,7 @@ The redesign must **not** change:
 - Existing dialogs and underlying config persistence behavior.
 - Existing action semantics such as analyze, generate, synthesize, render, cancel, and refresh.
 - Overall three-column workflow structure.
+- The current localization model where visible copy should match the active app language.
 
 The redesign **may** change:
 
@@ -145,6 +147,7 @@ The redesign **may** change:
 - Preserve keyboard usability of the existing inputs and dialogs.
 - Avoid over-styling that harms readability on long output text.
 - Ensure desktop-only spacing still behaves reasonably at smaller window sizes.
+- Any newly added visible labels, section headings, helper text, or status copy must be localized instead of hard-coded in mixed-language form.
 
 ## Testing Expectations
 

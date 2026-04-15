@@ -12,8 +12,9 @@ import {
   SelectFolderParams,
   StatEventParams,
 } from './types'
-import { EdgeTtsSynthesizeCommonParams } from './tts/types'
+import { TtsSynthesizeParams, TtsSynthesizeToFileParams } from './tts/types'
 import { RenderVideoParams } from './ffmpeg/types'
+import type { VLApiConfig, MatchVideoSegmentsParams } from './vl/types'
 
 // --------- 向界面渲染进程暴露某些API ---------
 
@@ -55,13 +56,38 @@ contextBridge.exposeInMainWorld('electron', {
   selectFolder: (params: SelectFolderParams) => ipcRenderer.invoke('select-folder', params),
   listFilesFromFolder: (params: ListFilesFromFolderParams) =>
     ipcRenderer.invoke('list-files-from-folder', params),
-  edgeTtsGetVoiceList: () => ipcRenderer.invoke('edge-tts-get-voice-list'),
-  edgeTtsSynthesizeToBase64: (params: EdgeTtsSynthesizeCommonParams) =>
-    ipcRenderer.invoke('edge-tts-synthesize-to-base64', params),
-  edgeTtsSynthesizeToFile: (params: EdgeTtsSynthesizeCommonParams) =>
-    ipcRenderer.invoke('edge-tts-synthesize-to-file', params),
+  ttsSynthesizeToUrl: (params: TtsSynthesizeParams) =>
+    ipcRenderer.invoke('tts-synthesize-to-url', params),
+  ttsSynthesizeToFile: (params: TtsSynthesizeToFileParams) =>
+    ipcRenderer.invoke('tts-synthesize-to-file', params),
   renderVideo: (params: RenderVideoParams) => ipcRenderer.invoke('render-video', params),
   statTrack: (params: StatEventParams) => ipcRenderer.invoke('stat-track', params),
+  // VL 视觉大模型相关
+  vlTestConnection: (params: VLApiConfig) => ipcRenderer.invoke('vl-test-connection', params),
+  vlAnalyzeVideoAssets: (params: { videoPaths: string[]; apiConfig: VLApiConfig; intervalSeconds?: number }) =>
+    ipcRenderer.invoke('vl-analyze-video-assets', params),
+  vlCancelAnalysis: () => ipcRenderer.send('vl-cancel-analysis'),
+  vlClearVideoAnalysis: (params?: { videoPath?: string }) =>
+    ipcRenderer.invoke('vl-clear-video-analysis', params),
+  vlGetAnalysisStats: (params: { videoPaths: string[] }) =>
+    ipcRenderer.invoke('vl-get-analysis-stats', params),
+  vlMatchVideoSegments: (params: MatchVideoSegmentsParams) =>
+    ipcRenderer.invoke('vl-match-video-segments', params),
+  // 产品参考管理
+  vlAnalyzeProductReference: (params: { imagePaths: string[]; apiConfig: VLApiConfig }) =>
+    ipcRenderer.invoke('vl-analyze-product-reference', params),
+  vlSaveProductReference: (params: { name: string; imagePaths: string[]; features: string; highlights: string; targetAudience: string; description?: string; colors?: string[]; tags?: string[] }) =>
+    ipcRenderer.invoke('vl-save-product-reference', params),
+  vlUpdateProductReference: (params: { id: string; name: string; imagePaths: string[]; features: string; highlights: string; targetAudience: string }) =>
+    ipcRenderer.invoke('vl-update-product-reference', params),
+  vlUpdateProductAnalysis: (params: { id: string; analysis: { description: string; colors: string[]; tags: string[] } }) =>
+    ipcRenderer.invoke('vl-update-product-analysis', params),
+  vlGetProductReferences: () => ipcRenderer.invoke('vl-get-product-references'),
+  vlGetProductReferenceById: (params: { id: string }) =>
+    ipcRenderer.invoke('vl-get-product-reference-by-id', params),
+  vlDeleteProductReference: (params: { id: string }) =>
+    ipcRenderer.invoke('vl-delete-product-reference', params),
+  selectImages: (params?: { title?: string }) => ipcRenderer.invoke('select-images', params),
 })
 
 contextBridge.exposeInMainWorld('sqlite', {

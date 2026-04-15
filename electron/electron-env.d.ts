@@ -39,17 +39,64 @@ interface Window {
     listFilesFromFolder: (
       params: import('./types').ListFilesFromFolderParams,
     ) => Promise<import('./types').ListFilesFromFolderRecord[]>
-    edgeTtsGetVoiceList: () => Promise<import('./lib/edge-tts').EdgeTTSVoice[]>
-    edgeTtsSynthesizeToBase64: (
-      params: import('./tts/types').EdgeTtsSynthesizeCommonParams,
+    ttsSynthesizeToUrl: (
+      params: import('./tts/types').TtsSynthesizeParams,
     ) => Promise<string>
-    edgeTtsSynthesizeToFile: (
-      params: import('./tts/types').EdgeTtsSynthesizeToFileParams,
-    ) => Promise<import('./tts/types').EdgeTtsSynthesizeToFileResult>
+    ttsSynthesizeToFile: (
+      params: import('./tts/types').TtsSynthesizeToFileParams,
+    ) => Promise<import('./tts/types').TtsSynthesizeToFileResult>
     renderVideo: (
       params: import('./ffmpeg/types').RenderVideoParams,
     ) => Promise<import('./ffmpeg/types').ExecuteFFmpegResult>
     statTrack: (params: import('./types').StatEventParams) => Promise<void>
+    // VL 视觉大模型相关
+    vlTestConnection: (params: import('./vl/types').VLApiConfig) => Promise<boolean>
+    vlAnalyzeVideoAssets: (params: {
+      videoPaths: string[]
+      apiConfig: import('./vl/types').VLApiConfig
+      intervalSeconds?: number
+    }) => Promise<import('./vl/types').AnalyzeVideoAssetsResult>
+    vlCancelAnalysis: () => void
+    vlClearVideoAnalysis: (params?: { videoPath?: string }) => Promise<void>
+    vlGetAnalysisStats: (params: {
+      videoPaths: string[]
+    }) => Promise<{ analyzedCount: number; totalCount: number }>
+    vlMatchVideoSegments: (
+      params: import('./vl/types').MatchVideoSegmentsParams,
+    ) => Promise<import('./vl/types').MatchVideoSegmentsResult>
+    // 产品参考管理
+    vlAnalyzeProductReference: (params: {
+      imagePaths: string[]
+      apiConfig: import('./vl/types').VLApiConfig
+    }) => Promise<import('./vl/types').AnalyzeProductReferenceResult>
+    vlSaveProductReference: (params: {
+      name: string
+      imagePaths: string[]
+      features: string
+      highlights: string
+      targetAudience: string
+      description?: string
+      colors?: string[]
+      tags?: string[]
+    }) => Promise<string>
+    vlUpdateProductReference: (params: {
+      id: string
+      name: string
+      imagePaths: string[]
+      features: string
+      highlights: string
+      targetAudience: string
+    }) => Promise<void>
+    vlUpdateProductAnalysis: (params: {
+      id: string
+      analysis: { description: string; colors: string[]; tags: string[] }
+    }) => Promise<void>
+    vlGetProductReferences: () => Promise<import('./vl/types').ProductReferenceRecord[]>
+    vlGetProductReferenceById: (params: {
+      id: string
+    }) => Promise<import('./vl/types').ProductReferenceRecord | undefined>
+    vlDeleteProductReference: (params: { id: string }) => Promise<void>
+    selectImages: (params?: { title?: string }) => Promise<string[]>
   }
   sqlite: {
     query: (param: import('./sqlite/types').QueryParams) => Promise<any>

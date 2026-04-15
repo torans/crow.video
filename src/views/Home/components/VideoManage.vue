@@ -1,56 +1,133 @@
 <template>
-  <div class="w-full h-full">
-    <v-form class="w-full h-full" :disabled="disabled">
-      <v-sheet class="h-full p-2 flex flex-col" border rounded>
-        <div class="flex gap-2 mb-2">
+  <div class="video-manage h-full">
+    <v-form class="h-full" :disabled="disabled">
+      <v-sheet class="video-manage__panel h-full">
+        <div class="workbench-section-header video-manage__header">
+          <div>
+            <div class="workbench-section-title">{{ workspaceText('title') }}</div>
+          </div>
+        </div>
+
+        <div class="video-manage__toolbar workbench-editor-surface">
           <v-text-field
             v-model="appStore.videoAssetsFolder"
             :label="t('features.assets.config.folderLabel')"
             density="compact"
             hide-details
             readonly
-          >
-          </v-text-field>
-          <v-btn
-            class="mt-[2px]"
-            prepend-icon="mdi-folder-open"
-            :disabled="disabled"
-            @click="handleSelectFolder"
-          >
+          />
+          <v-btn prepend-icon="mdi-folder-open" :disabled="disabled" @click="handleSelectFolder">
             {{ t('common.buttons.selectFolder') }}
           </v-btn>
         </div>
 
-        <div class="flex-1 h-0 w-full border">
-          <div
-            v-if="videoAssets.length"
-            class="w-full max-h-full overflow-y-auto grid grid-cols-3 gap-2 p-2"
-          >
-            <div
-              class="w-full h-full max-h-[200px]"
-              v-for="(item, index) in videoAssets"
-              :key="index"
-            >
-              <VideoAutoPreview :asset="item" />
-            </div>
+        <div class="video-manage__stage">
+          <div class="video-manage__stage-meta">
+            <span>{{ clipsCountText }}</span>
+            <span v-if="analysisStatsText && appStore.analysisStatus !== 'analyzing'">{{
+              analysisStatsText
+            }}</span>
           </div>
-          <v-empty-state
-            v-else
-            :headline="t('emptyStates.noContent')"
-            :text="t('emptyStates.hintSelectFolder')"
-          ></v-empty-state>
+
+          <div class="video-manage__grid-shell">
+            <div v-if="videoAssets.length" class="video-manage__grid">
+              <div
+                class="video-manage__grid-item"
+                v-for="(item, index) in videoAssets"
+                :key="index"
+              >
+                <VideoAutoPreview :asset="item" />
+              </div>
+            </div>
+            <v-empty-state
+              v-else
+              :headline="t('emptyStates.noContent')"
+              :text="t('emptyStates.hintSelectFolder')"
+              class="video-manage__empty"
+            />
+          </div>
         </div>
 
-        <div class="my-2">
-          <v-btn
-            block
-            prepend-icon="mdi-refresh"
-            :disabled="disabled || !appStore.videoAssetsFolder"
-            :loading="refreshAssetsLoading"
-            @click="refreshAssets"
-          >
-            {{ t('common.buttons.refreshAssets') }}
-          </v-btn>
+        <div class="video-manage__footer">
+          <div class="video-manage__ops">
+            <v-btn
+              block
+              prepend-icon="mdi-refresh"
+              :disabled="disabled || !appStore.videoAssetsFolder"
+              :loading="refreshAssetsLoading"
+              @click="refreshAssets"
+            >
+              {{ t('common.buttons.refreshAssets') }}
+            </v-btn>
+
+            <v-switch
+              v-model="appStore.smartMatchEnabled"
+              :label="
+                appStore.smartMatchEnabled
+                  ? t('features.analysis.smartMatch')
+                  : t('features.analysis.randomMode')
+              "
+              color="primary"
+              density="compact"
+              hide-details
+              :disabled="disabled"
+            />
+          </div>
+
+          <template v-if="appStore.smartMatchEnabled">
+            <div
+              v-if="analysisStatsText && appStore.analysisStatus !== 'analyzing'"
+              class="video-manage__stats"
+            >
+              {{ analysisStatsText }}
+            </div>
+
+            <div
+              v-if="appStore.analysisStatus === 'analyzing'"
+              class="video-manage__analysis workbench-editor-surface"
+            >
+              <div class="video-manage__analysis-row">
+                <div class="flex items-center gap-2">
+                  <v-progress-circular indeterminate size="16" width="2" color="primary" />
+                  <span class="text-xs font-medium" style="color: var(--workbench-text)">
+                    {{ t('features.analysis.analyzing') }}
+                  </span>
+                </div>
+                <span
+                  class="text-xs"
+                  style="color: var(--workbench-text-soft)"
+                  v-if="appStore.analysisProgress.total > 0"
+                >
+                  {{ appStore.analysisProgress.current }} / {{ appStore.analysisProgress.total }}
+                </span>
+              </div>
+              <v-progress-linear
+                v-if="appStore.analysisProgress.total > 0"
+                :model-value="
+                  (appStore.analysisProgress.current / appStore.analysisProgress.total) * 100
+                "
+                color="primary"
+                height="6"
+                rounded
+              />
+              <v-btn block size="small" variant="tonal" color="error" @click="handleCancelAnalysis">
+                {{ t('common.buttons.stop') }}
+              </v-btn>
+            </div>
+
+            <v-btn
+              v-else
+              block
+              size="small"
+              prepend-icon="mdi-brain"
+              color="primary"
+              variant="tonal"
+              :disabled="disabled || !appStore.videoAssetsFolder || !hasVLConfig"
+              @click="handleAnalyzeAssets"
+            >
+              {{ t('features.analysis.analyzeAssets') }}
+            </v-btn>
+          </template>
         </div>
       </v-sheet>
     </v-form>
@@ -58,7 +135,7 @@
 </template>
 
 <script lang="ts" setup>
-import { h, onMounted, ref, toRaw } from 'vue'
+import { h, onMounted, ref, toRaw, computed } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '@/store'
 import { useToast } from 'vue-toastification'
@@ -71,7 +148,19 @@ import { formatErrorForCopy } from '@/lib/error-copy'
 
 const toast = useToast()
 const appStore = useAppStore()
-const { t } = useTranslation()
+const { t, i18next } = useTranslation()
+
+const workspaceFallbacks = {
+  title: { zh: '素材浏览台', en: 'Media Browser' },
+} as const
+
+const workspaceText = (key: keyof typeof workspaceFallbacks) => {
+  const value = t(`features.assets.workspace.${key}`) as string
+  if (value !== `features.assets.workspace.${key}`) return value
+  return i18next.language?.startsWith('zh')
+    ? workspaceFallbacks[key].zh
+    : workspaceFallbacks[key].en
+}
 
 defineProps<{
   disabled?: boolean
@@ -93,6 +182,15 @@ const handleSelectFolder = async () => {
 // 刷新素材库
 const videoAssets = ref<ListFilesFromFolderRecord[]>([])
 const videoDurationCache = ref(new Map<string, number>())
+const clipsCountText = computed(() => {
+  const value = t('features.assets.workspace.clipsCount', {
+    count: videoAssets.value.length,
+  }) as string
+  if (value !== 'features.assets.workspace.clipsCount') return value
+  return i18next.language?.startsWith('zh')
+    ? `${videoAssets.value.length} 个片段`
+    : `${videoAssets.value.length} clips`
+})
 const refreshAssetsLoading = ref(false)
 const refreshAssets = async () => {
   if (!appStore.videoAssetsFolder) {
@@ -105,6 +203,7 @@ const refreshAssets = async () => {
     })
     console.log(`素材库刷新:`, assets)
     videoAssets.value = assets.filter((asset) => asset.name.toLowerCase().endsWith('.mp4'))
+    appStore.videoAssets = videoAssets.value.map((a) => a.path)
     videoDurationCache.value.clear()
     if (!videoAssets.value.length) {
       if (assets.length) {
@@ -142,6 +241,66 @@ const refreshAssets = async () => {
 onMounted(() => {
   refreshAssets()
 })
+
+// VL 分析相关
+const hasVLConfig = computed(() => {
+  return !!(appStore.vlConfig.apiUrl && appStore.vlConfig.modelName)
+})
+
+const analysisStatsText = ref('')
+const refreshAnalysisStats = async () => {
+  if (!videoAssets.value.length) {
+    analysisStatsText.value = ''
+    return
+  }
+  try {
+    const stats = await window.electron.vlGetAnalysisStats({
+      videoPaths: videoAssets.value.map((a) => a.path),
+    })
+    analysisStatsText.value = t('features.analysis.stats', {
+      analyzed: stats.analyzedCount,
+      total: stats.totalCount,
+    })
+  } catch {
+    analysisStatsText.value = ''
+  }
+}
+
+// Listen for analysis progress from main process
+window.ipcRenderer.on('vl-analysis-progress', (_, data: { current: number; total: number }) => {
+  appStore.analysisProgress = data
+})
+
+const handleAnalyzeAssets = async () => {
+  if (!videoAssets.value.length || !hasVLConfig.value) return
+
+  appStore.analysisStatus = 'analyzing'
+  appStore.analysisProgress = { current: 0, total: videoAssets.value.length }
+  toast.info(t('features.analysis.analysisStarted'))
+
+  try {
+    await window.electron.vlAnalyzeVideoAssets({
+      videoPaths: videoAssets.value.map((a) => a.path),
+      apiConfig: toRaw(appStore.vlConfig),
+    })
+    appStore.analysisStatus = 'done'
+    await refreshAnalysisStats()
+    toast.success(t('features.analysis.analysisComplete'))
+  } catch (e: any) {
+    console.error('分析素材失败:', e)
+    appStore.analysisStatus = 'idle'
+    if (e?.message?.includes('cancel')) {
+      toast.warning(t('features.analysis.analysisCancelled'))
+    } else {
+      toast.error(t('features.analysis.analysisFailed'))
+    }
+  }
+}
+
+const handleCancelAnalysis = () => {
+  window.electron.vlCancelAnalysis()
+  appStore.analysisStatus = 'idle'
+}
 
 const readVideoDuration = (assetPath: string) => {
   const cached = videoDurationCache.value.get(assetPath)
@@ -303,5 +462,98 @@ defineExpose({ getVideoSegments })
 </script>
 
 <style lang="scss" scoped>
-//
+.video-manage {
+  height: 100%;
+}
+
+.video-manage__panel {
+  height: 100%;
+  padding: 20px;
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.video-manage__toolbar {
+  padding: 12px;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.video-manage__stage {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.video-manage__stage-meta {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 12px;
+  color: var(--workbench-text-soft);
+}
+
+.video-manage__grid-shell {
+  flex: 1;
+  min-height: 0;
+  border-radius: 22px;
+  background: rgba(255, 251, 246, 0.92);
+  border: 1px solid rgba(55, 39, 24, 0.08);
+  overflow: hidden;
+}
+
+.video-manage__grid {
+  width: 100%;
+  max-height: 100%;
+  overflow-y: auto;
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  padding: 12px;
+}
+
+.video-manage__grid-item {
+  min-height: 200px;
+}
+
+.video-manage__empty {
+  height: 100%;
+}
+
+.video-manage__footer {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.video-manage__ops {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 12px;
+  align-items: center;
+}
+
+.video-manage__stats {
+  font-size: 12px;
+  color: var(--workbench-text-soft);
+}
+
+.video-manage__analysis {
+  padding: 12px;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+
+.video-manage__analysis-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
 </style>

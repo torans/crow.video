@@ -7,30 +7,23 @@
 
 ---
 
-<!-- 项目LOGO -->
 <br />
 <div align="center">
   <a href="https://github.com/YILS-LIN/short-video-factory">
     <img src="public/icon.png" alt="Logo" height="100">
   </a>
 
-<h3 align="center">AI Short Video Factory - 短视频工厂</h3>
+  <h3 align="center">AI Short Video Factory - 短视频工厂</h3>
 
   <p align="center">
-    🚀 一键生成产品营销与泛内容短视频，AI批量自动剪辑，高颜值跨平台桌面端工具
+    一键生成产品营销短视频 · AI批量自动剪辑 · 高颜值跨平台桌面端工具
   </p>
 
-  <!-- 项目徽章 -->
-
-[![贡献者][contributors-shield]][contributors-url]
-[![分支][forks-shield]][forks-url]
-[![星标][stars-shield]][stars-url]
-[![问题][issues-shield]][issues-url]
-[![最新版本][release-shield]][release-url]
-
-<!-- ![发布日期][release-date-shield] -->
-
-[![许可证][license-shield]][license-url]
+  [![贡献者][contributors-shield]][contributors-url]
+  [![星标][stars-shield]][stars-url]
+  [![问题][issues-shield]][issues-url]
+  [![最新版本][release-shield]][release-url]
+  [![许可证][license-shield]][license-url]
 
   <p align="center">
     <a href="https://github.com/YILS-LIN/short-video-factory/issues/new?labels=bug&template=bug-report---.md">报告Bug</a>
@@ -39,94 +32,97 @@
   </p>
 </div>
 
-<!-- 关于项目 -->
+---
 
 ## 📖 关于项目
 
-短视频工厂是一个开源的桌面端应用，旨在通过AI技术简化短视频的制作流程。用户可以通过简单的提示词文本+视频分镜素材，快速且自动的剪辑出高质量的产品营销和泛内容短视频。该项目集成了AI驱动的文案生成、语音合成、视频剪辑、字幕特效等功能，旨在为用户提供开箱即用的短视频制作体验。
+短视频工厂是一个开源桌面端应用，通过 AI 技术简化短视频制作流程。用户只需提供产品信息和文案，即可自动剪辑出高质量的产品营销视频。
 
 ### 核心功能
 
-- 🤖 **AI驱动**：集成了最新的AI技术，提升视频制作效率和质量
-- 📝 **文案生成**：基于提示词生成高质量的短视频文案
-- 🎥 **自动剪辑**：支持多种视频格式，自动化批量处理视频剪辑任务
-- 🎙️ **语音合成**：将生成的文案转换为自然流畅的语音
-- 🎬 **字幕特效**：自动添加字幕和特效，提升视频质量
-- 📦 **批量处理**：支持批量任务，按预设自动持续合成视频
-- 🌐 **多语言支持**：支持中文、英文等多种语言，满足不同用户需求
-- 📦 **开箱即用**：无需复杂配置，用户可以快速上手
-- 📈 **持续更新**：定期发布新版本，修复bug并添加新功能
-- 🔒 **安全可靠**：完全本地本地化运行，确保用户数据安全
-- 🎨 **用户友好**：简洁直观的用户界面，易于操作
-- 💻 **多平台支持**：支持Windows、macOS和Linux等多个操作系统
+| 功能 | 说明 |
+|------|------|
+| 🤖 AI 文案生成 | 基于产品信息自动生成营销文案 |
+| 🎙️ 语音合成 | 将文案转换为自然语音（EdgeTTS） |
+| 🎥 智能选片 | 根据产品视觉特征自动匹配素材片段 |
+| 🎬 视频合成 | FFmpeg 驱动，自动剪辑配音+素材+字幕 |
+| 📦 批量处理 | 支持任务队列，自动持续合成多个视频 |
+| 🌐 多语言 | 支持中文、英文等多种语言 |
+| 🔒 本地运行 | 数据完全本地处理，保障隐私安全 |
+
+### 适用场景
+
+- 🛒 **电商产品展示** — 淘宝、抖音、亚马逊等产品视频
+- 📱 **社交媒体内容** — 微信视频号、小红书短视频
+- 📺 **品牌营销物料** — 企业宣传、活动推广视频
 
 <p align="right">(<a href="#readme-top">返回顶部</a>)</p>
+
+---
 
 ## 🚀 开始使用
 
-前往 [Github Release](https://github.com/YILS-LIN/short-video-factory/releases) 下载最新版本
+1. 前往 [Github Release](https://github.com/YILS-LIN/short-video-factory/releases) 下载最新版本
+2. 解压并运行应用
+3. 配置 AI API（支持 OpenAI 兼容接口）
+4. 添加产品信息和视频素材，开始创作
 
-前往 [官方文档](https://short-video-factory.yils.blog) 查看使用手册
+📖 详细使用手册：[官方文档](https://short-video-factory.yils.blog)
 
 <p align="right">(<a href="#readme-top">返回顶部</a>)</p>
+
+---
 
 ## 🗺️ 路线图
 
 **喜欢可以点个 Star 支持一下哦！**
 
-下面是已实现和计划中的功能：
+### 已完成
 
-- [x] 文案生成，兼容通用的 OpenAI 接口格式
-- [x] 语音合成，支持EdgeTTS
-- [x] 视频剪辑，文案、视频、音频、字幕合成，自动混剪
-- [x] 批量处理，支持一个批量任务，按预设自动持续合成视频
-- [x] 多语言支持，能够支持中文、英文等多种语言
-- [x] 完善的使用手册
-- [ ] 更全面的参数调整
-- [ ] 更多的语音合成API
-- [ ] 字幕特效，支持多种字幕样式和特效
+- [x] AI 文案生成（兼容 OpenAI 接口格式）
+- [x] 语音合成（EdgeTTS）
+- [x] 视频剪辑（FFmpeg 自动混剪）
+- [x] 智能选片（基于产品视觉特征匹配）
+- [x] 批量处理任务
+- [x] 多语言支持
+- [x] 完整使用手册
 
-查看[开放问题](https://github.com/YILS-LIN/short-video-factory/issues)以获取提议功能（和已知问题）的完整列表。
+### 计划中
+
+- [ ] 故事线模板（自定义视频叙事结构）
+- [ ] 更多语音合成 API 支持
+- [ ] 字幕样式和特效
+- [ ] 更丰富的参数调整选项
+
+查看 [开放问题](https://github.com/YILS-LIN/short-video-factory/issues) 获取完整功能列表。
 
 <p align="right">(<a href="#readme-top">返回顶部</a>)</p>
+
+---
 
 ## 🎞️ 示例视频
 
-<table>
-<thead>
-<tr>
-<th align="center"><g-emoji class="g-emoji" alias="arrow_forward">▶️</g-emoji> 《产品营销短视频》</th>
-<th align="center"><g-emoji class="g-emoji" alias="arrow_forward">▶️</g-emoji> 《暖心治愈系语录》</th>
-</tr>
-</thead>
-<tbody>
-<tr>
-<td align="center"><video src="https://github.com/user-attachments/assets/165a8f96-861b-4cf3-946c-444b9692cef8"></video></td>
-<td align="center"><video src="https://github.com/user-attachments/assets/12694618-e0fe-4848-8a7e-98b3f3a7aece"></video></td>
-</tr>
-</tbody>
-</table>
+> 素材来源于网络，仅用于展示剪辑效果
 
-注：素材来源于网络，仅用于展示剪辑效果
+| 产品营销 | 泛内容语录 |
+|:--------:|:---------:|
+| ▶️ [点击观看](https://github.com/user-attachments/assets/165a8f96-861b-4cf3-946c-444b9692cef8) | ▶️ [点击观看](https://github.com/user-attachments/assets/12694618-e0fe-4848-8a7e-98b3f3a7aece) |
 
 <p align="right">(<a href="#readme-top">返回顶部</a>)</p>
 
-<!-- 贡献 -->
+---
 
 ## 🤝 贡献
 
-贡献让开源社区成为了一个学习、启发和创造的绝佳场所。**非常感谢**您所做的任何贡献。
+贡献让开源社区成为学习、启发和创造的绝佳场所。**非常感谢**任何贡献。
 
-如果您有可以改善此项目的建议，请fork本项目仓库并创建一个pull request。您也可以简单地创建一个带有"enhancement"标签的issue。
-不要忘记给项目点个Star！再次感谢！
+1. Fork 此项目
+2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
+3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
+4. 推送分支 (`git push origin feature/AmazingFeature`)
+5. 创建 Pull Request
 
-1. Fork此项目
-2. 创建您的功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交您的更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送到分支 (`git push origin feature/AmazingFeature`)
-5. 开启一个Pull Request
-
-### 主要贡献者：
+### 主要贡献者
 
 <a href="https://github.com/YILS-LIN/short-video-factory/graphs/contributors">
   <img src="https://contrib.rocks/image?repo=YILS-LIN/short-video-factory" alt="contrib.rocks image" />
@@ -134,38 +130,26 @@
 
 <p align="right">(<a href="#readme-top">返回顶部</a>)</p>
 
+---
+
 ## 💖 鸣谢
 
-- [rany2/edge-tts](https://github.com/rany2/edge-tts)
-- [duyquangnvx/edge-tts](https://github.com/duyquangnvx/edge-tts)
+- [rany2/edge-tts](https://github.com/rany2/edge-tts) — Edge TTS 语音合成
+- [duyquangnvx/edge-tts](https://github.com/duyquangnvx/edge-tts) — TTS 相关
 
 <p align="right">(<a href="#readme-top">返回顶部</a>)</p>
 
-<!-- 许可证 -->
+---
 
-## 🎗 许可证
+## 🎗️ 许可证
 
 [![许可证][license-shield]][license-url]
 
-Copyright © 2025 YILS.
+Copyright © 2025-present YILS. 基于 MIT 许可证开源。
 
 <p align="right">(<a href="#readme-top">返回顶部</a>)</p>
 
-## 🐱 捐赠
-
-如果这个项目对你有帮助，欢迎请作者喝杯咖啡(或者啤酒) 🍺
-
-你的 **Star ⭐** 和 **捐赠** 是我持续更新的最大动力！
-
-<div align="left">
-  <img src="https://github.com/user-attachments/assets/6b832dd3-38ea-4927-9c3b-97549c77a1f0" alt="YILS的微信赞赏码" width="400">
-</div>
-
-👉 在此处查看捐赠者名单：[千古留名 - 捐赠者留言板](https://short-video-factory.yils.blog/donate/list.html)
-
-<p align="right">(<a href="#readme-top">返回顶部</a>)</p>
-
-<!-- 星标历史 -->
+---
 
 ## ⭐ 星标历史
 
@@ -177,7 +161,7 @@ Copyright © 2025 YILS.
 
 <p align="right">(<a href="#readme-top">返回顶部</a>)</p>
 
-<!-- MARKDOWN链接和图片 -->
+<!-- 链接 -->
 
 [contributors-shield]: https://img.shields.io/github/contributors/YILS-LIN/short-video-factory.svg?color=c4f042&labelColor=black&style=flat-square
 [contributors-url]: https://github.com/YILS-LIN/short-video-factory/graphs/contributors

@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "AI Short Video Factory"
+    "name": "Crow Video Factory"
   },
   "menu": {
     "app": {
@@ -49,7 +49,9 @@
       "test": "Test",
       "close": "Close",
       "refreshAssets": "Refresh Assets",
-      "copyErrorDetail": "Copy error details"
+      "copyErrorDetail": "Copy error details",
+      "confirm": "Confirm",
+      "cancel": "Cancel"
     },
     "states": {
       "noData": "No data"
@@ -72,26 +74,34 @@
     "renderConfig": "Configure render options"
   },
   "footer": {
-    "poweredBy": "Powered by YILS (Blog: https://yils.blog)"
+    "poweredBy": "Powered by Crow Video Factory (crow.video)"
   },
   "features": {
     "llm": {
       "config": {
-        "promptLabel": "Prompt",
+        "promptLabel": "Prompt(optional)",
+        "promptPlaceholder": "Enter prompt text (optional)",
         "outputLabel": "Output Text (editable)",
         "configTitle": "Configure LLM API",
         "modelName": "Model Name",
         "apiUrl": "API URL",
         "apiKey": "API Key",
+        "language": "Output Language",
         "compatibleNote": "Compatible with any OpenAI-compatible API"
       },
       "errors": {
         "promptRequired": "Prompt cannot be empty",
+        "apiKeyRequired": "Please configure API Key first",
         "connectionFailed": "LLM connection failed, please check your configuration",
         "generateFailed": "Generation failed, please check LLM configuration"
       },
       "success": {
         "connectionSucceeded": "LLM connected successfully"
+      },
+      "workspace": {
+        "kicker": "Compose",
+        "title": "Script Studio",
+        "note": "Set the prompt first, then generate short-form script copy you can edit directly."
       }
     },
     "tts": {
@@ -100,6 +110,9 @@
         "gender": "Gender",
         "voice": "Voice",
         "speed": "Speed",
+        "apiUrl": "API URL",
+        "apiKey": "API Key",
+        "model": "Model",
         "tryText": "Try-listen text",
         "tryListen": "Try listen",
         "selectLanguageGenderFirst": "Please select language and gender first",
@@ -117,10 +130,16 @@
         "fileCorrupt": "TTS failed: audio file is corrupted",
         "zeroDuration": "TTS duration is 0s. Check TTS config and network connectivity",
         "configInvalid": "TTS configuration is invalid",
-        "trySynthesisNetwork": "Failed to synthesize try-listen audio. Please check network"
+        "trySynthesisNetwork": "Failed to synthesize try-listen audio. Please check network",
+        "apiKeyRequired": "Please configure the TTS API key first"
       },
       "info": {
         "playTryAudio": "Playing try-listen audio"
+      },
+      "workspace": {
+        "kicker": "Voice",
+        "title": "Voice Console",
+        "note": "Choose the voice, language, and audition the current spoken script."
       }
     },
     "assets": {
@@ -134,7 +153,90 @@
       },
       "success": {
         "loadSucceeded": "Assets loaded successfully"
+      },
+      "workspace": {
+        "kicker": "Assets",
+        "title": "Media Browser",
+        "note": "Import storyboard assets, refresh the library, and enable smart matching when needed.",
+        "clipsCount": "{{count}} clips"
       }
+    },
+    "product": {
+      "config": {
+        "title": "Product Reference",
+        "nameLabel": "Product Name",
+        "namePlaceholder": "Enter product name",
+        "imagesLabel": "Product Images",
+        "selectImages": "Select Images",
+        "featuresLabel": "Features",
+        "featuresPlaceholder": "e.g. Waterproof, lightweight, 12-hour battery",
+        "highlightsLabel": "Highlights / Selling Points",
+        "highlightsPlaceholder": "e.g. Industry-first XX technology, 50% lighter",
+        "targetAudienceLabel": "Target Audience",
+        "targetAudiencePlaceholder": "e.g. Outdoor sports enthusiasts",
+        "analyzeAppearance": "Analyze Appearance",
+        "analyzing": "Analyzing...",
+        "saveProduct": "Save Product",
+        "deleteProduct": "Delete",
+        "selectProduct": "Select Product",
+        "noProduct": "No products yet",
+        "addProduct": "Add Product",
+        "editProduct": "Edit Product",
+        "updateProduct": "Update Product",
+        "deleteConfirmTitle": "Delete Product",
+        "deleteConfirmMessage": "Are you sure you want to delete this product? This action cannot be undone.",
+        "colorsLabel": "Detected Colors",
+        "tagsLabel": "Detected Tags",
+        "descriptionLabel": "Appearance Description"
+      },
+      "errors": {
+        "nameRequired": "Please enter a product name",
+        "imagesRequired": "Please select at least one product image",
+        "saveFailed": "Failed to save product",
+        "analyzeFailed": "Failed to analyze product appearance",
+        "deleteFailed": "Failed to delete product",
+        "vlNotConfigured": "Please configure the Vision Model API first"
+      },
+      "success": {
+        "saved": "Product saved",
+        "updated": "Product updated",
+        "deleted": "Product deleted",
+        "analyzeCompleted": "Product appearance analysis completed"
+      },
+      "workspace": {
+        "kicker": "Product",
+        "title": "Product Studio",
+        "note": "Start script creation from the product features, look, and audience.",
+        "analysisTitle": "Recognition Summary",
+        "emptyNote": "Select a product first to unlock the full creative flow on the left."
+      }
+    },
+    "vl": {
+      "config": {
+        "title": "Vision Model Config",
+        "modelName": "Model Name",
+        "apiUrl": "API URL",
+        "apiKey": "API Key",
+        "note": "Compatible with OpenAI Vision API format (e.g. qwen-vl)"
+      },
+      "errors": {
+        "connectionFailed": "Vision model connection failed"
+      },
+      "success": {
+        "connectionSucceeded": "Vision model connected successfully"
+      }
+    },
+    "analysis": {
+      "analyzeAssets": "Analyze Assets",
+      "analyzing": "Analyzing assets...",
+      "analysisStarted": "Analysis started",
+      "analysisComplete": "Analysis complete",
+      "analysisCancelled": "Analysis cancelled",
+      "analysisFailed": "Analysis failed",
+      "stats": "Analyzed {{analyzed}}/{{total}} videos",
+      "smartMatch": "Smart Match",
+      "randomMode": "Random Mode",
+      "clearAnalysis": "Clear Analysis Data"
     },
     "render": {
       "config": {
@@ -145,7 +247,7 @@
         "output": {
           "width": "Output width",
           "height": "Output height",
-          "fileName": "Output file name",
+          "fileName": "Filename prefix",
           "format": "Output format",
           "folder": "Output folder"
         }
@@ -172,6 +274,13 @@
       "info": {
         "batchNext": "Start next render",
         "canceled": "Video rendering canceled"
+      },
+      "workspace": {
+        "kicker": "Render",
+        "title": "Render Tower",
+        "note": "Confirm the current status, then start rendering. The right column focuses on execution and feedback.",
+        "runningHint": "The current pipeline is running.",
+        "idleHint": "Everything is ready. Start rendering when you want."
       }
     }
   }

@@ -109,6 +109,10 @@ class Database {
     })
   }
 
+  exec(sql: string): void {
+    this.db.exec(sql)
+  }
+
   async bulkInsertOrUpdate(param: BulkInsertOrUpdateParams): Promise<void> {
     return new Promise<void>((resolve, _reject) => {
       const keys = Object.keys(param.data[0])
@@ -123,7 +127,7 @@ class Database {
       const stmt = this.db.prepare(sql)
 
       // 开始事务
-      const transaction = this.db.transaction((records) => {
+      const transaction = this.db.transaction((records: Record<string, any>[]) => {
         for (const record of records) {
           stmt.run(...Object.values(record))
         }
@@ -140,6 +144,50 @@ const db = new Database()
 export const initSqlite = async () => {
   try {
     await db.open()
+
+    // 创建产品参考表
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS product_reference (
+        id TEXT PRIMARY KEY,
+        name TEXT NOT NULL DEFAULT '',
+        image_paths TEXT NOT NULL DEFAULT '[]',
+        features TEXT NOT NULL DEFAULT '',
+        highlights TEXT NOT NULL DEFAULT '',
+        target_audience TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        colors TEXT NOT NULL DEFAULT '[]',
+        tags TEXT NOT NULL DEFAULT '[]',
+        created_at INTEGER NOT NULL DEFAULT 0
+      )
+    `)
+
+    // 创建素材帧分析表
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS video_frame_analysis (
+        id TEXT PRIMARY KEY,
+        video_path TEXT NOT NULL,
+        timestamp REAL NOT NULL DEFAULT 0,
+        frame_path TEXT NOT NULL DEFAULT '',
+        description TEXT NOT NULL DEFAULT '',
+        colors TEXT NOT NULL DEFAULT '[]',
+        tags TEXT NOT NULL DEFAULT '[]',
+        appeal REAL NOT NULL DEFAULT 5,
+        analyzed_at INTEGER NOT NULL DEFAULT 0
+      )
+    `)
+
+    // 为素材帧分析表创建索引，加速按视频路径查询
+    db.exec(`
+      CREATE INDEX IF NOT EXISTS idx_vfa_video_path ON video_frame_analysis(video_path)
+    `)
+
+    // 兼容旧数据：如果 appeal 列不存在则添加
+    try {
+      db.exec(`ALTER TABLE video_frame_analysis ADD COLUMN appeal REAL NOT NULL DEFAULT 5`)
+    } catch {
+      // 列已存在，忽略
+    }
+
     console.log('Database initialized.')
   } catch (err) {
     console.error('Error opening database:', err)

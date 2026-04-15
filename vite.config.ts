@@ -3,14 +3,12 @@ import { fileURLToPath, URL } from 'node:url'
 import { defineConfig } from 'vite'
 import electron from 'vite-plugin-electron/simple'
 import vue from '@vitejs/plugin-vue'
-import vueDevTools from 'vite-plugin-vue-devtools'
 import UnoCSS from 'unocss/vite'
 
 // https://vitejs.dev/config/
 export default defineConfig({
   plugins: [
     vue(),
-    vueDevTools(),
     UnoCSS(),
     electron({
       main: {
@@ -19,7 +17,10 @@ export default defineConfig({
         vite: {
           build: {
             rollupOptions: {
-              external: ['better-sqlite3'],
+              external: ['better-sqlite3', 'i18next-fs-backend'],
+              output: {
+                inlineDynamicImports: true,
+              },
             },
           },
         },

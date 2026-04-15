@@ -2,7 +2,7 @@
   <div class="w-full h-full">
     <video
       ref="Video"
-      class="w-full h-full object-cover"
+      class="w-full h-full object-cover rounded-xl"
       :src="fileSrc"
       muted
       loop

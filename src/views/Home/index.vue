@@ -1,29 +1,40 @@
 <template>
-  <div class="w-full h-full flex flex-col">
-    <div class="w-full h-[40px] window-drag relative border-b">
+  <div class="home-workbench">
+    <div class="home-titlebar window-drag">
       <div class="window-control-bar-no-drag-mask"></div>
     </div>
 
-    <div class="w-full h-0 flex-1 flex box-border gap-2 py-2 px-3">
-      <div class="w-1/3 h-full">
-        <TextGenerate
-          ref="TextGenerateInstance"
-          :disabled="appStore.renderStatus === RenderStatus.GenerateText"
-        />
-      </div>
-      <div class="w-1/3 h-full">
+    <div class="home-workbench__body">
+      <section class="home-column home-column--creative">
+        <div class="home-column-stack home-column-stack--creative-top">
+          <ProductReference />
+        </div>
+        <div class="home-column-stack home-column-stack--creative-bottom">
+          <TextGenerate
+            ref="TextGenerateInstance"
+            :disabled="appStore.renderStatus === RenderStatus.GenerateText"
+          />
+        </div>
+      </section>
+
+      <section class="home-column home-column--assets">
         <VideoManage
           ref="VideoManageInstance"
           :disabled="appStore.renderStatus === RenderStatus.SegmentVideo"
         />
-      </div>
-      <div class="w-1/3 h-full flex flex-col gap-3">
-        <TtsControl
-          ref="TtsControlInstance"
-          :disabled="appStore.renderStatus === RenderStatus.SynthesizedSpeech"
-        />
-        <VideoRender @render-video="handleRenderVideo" @cancel-render="handleCancelRender" />
-      </div>
+      </section>
+
+      <section class="home-column home-column--execute">
+        <div class="home-column-stack home-column-stack--execute-top">
+          <TtsControl
+            ref="TtsControlInstance"
+            :disabled="appStore.renderStatus === RenderStatus.SynthesizedSpeech"
+          />
+        </div>
+        <div class="home-column-stack home-column-stack--execute-bottom">
+          <VideoRender @render-video="handleRenderVideo" @cancel-render="handleCancelRender" />
+        </div>
+      </section>
     </div>
   </div>
 </template>
@@ -33,6 +44,7 @@ import TextGenerate from './components/TextGenerate.vue'
 import VideoManage from './components/VideoManage.vue'
 import TtsControl from './components/TtsControl.vue'
 import VideoRender from './components/VideoRender.vue'
+import ProductReference from './components/ProductReference.vue'
 
 import { h, ref } from 'vue'
 import { RenderStatus, useAppStore } from '@/store'
@@ -56,6 +68,28 @@ const buildStatPayload = (title: string) => ({
 
 const trackStat = (title: string) => {
   window.electron.statTrack(buildStatPayload(title)).catch(() => {})
+}
+
+// 构建产品上下文，用于注入 LLM prompt
+const buildProductContext = (): string | undefined => {
+  const product = appStore.currentProduct
+  if (!product) return undefined
+
+  const parts: string[] = []
+  parts.push(`你是一个专业的短视频口播文案撰写人。请严格遵守以下规则：`)
+  parts.push(`1. 只输出口播文案正文，不要输出标题、标签、分段、markdown格式`)
+  parts.push(`2. 文案必须是口语化的，像真人说话一样自然流畅`)
+  parts.push(`3. 字数严格控制在80-150字，适合15-30秒的短视频`)
+  parts.push(`4. 必须突出产品卖点，有吸引力和购买欲`)
+  parts.push(``)
+  parts.push(`产品信息：`)
+  parts.push(`产品名称：${product.name}`)
+  if (product.features) parts.push(`核心功能：${product.features}`)
+  if (product.highlights) parts.push(`产品亮点：${product.highlights}`)
+  if (product.target_audience) parts.push(`目标受众：${product.target_audience}`)
+  if (product.description) parts.push(`产品外观：${product.description}`)
+
+  return parts.join('\n')
 }
 
 // 渲染合成视频
@@ -123,7 +157,9 @@ const handleRenderVideo = async () => {
     appStore.updateRenderStatus(RenderStatus.GenerateText)
     const text =
       TextGenerateInstance.value?.getCurrentOutputText() ||
-      (await TextGenerateInstance.value?.handleGenerate())!
+      (await TextGenerateInstance.value?.handleGenerate({
+        productContext: buildProductContext(),
+      }))!
 
     // TTS合成语音
     // @ts-ignore
@@ -133,7 +169,6 @@ const handleRenderVideo = async () => {
     appStore.updateRenderStatus(RenderStatus.SynthesizedSpeech)
     const ttsResult = await TtsControlInstance.value?.synthesizedSpeechToFile({
       text,
-      withCaption: true,
     })
     if (ttsResult?.duration === undefined) {
       throw new Error(t('features.tts.errors.fileCorrupt'))
@@ -142,15 +177,66 @@ const handleRenderVideo = async () => {
       throw new Error(t('features.tts.errors.zeroDuration'))
     }
 
-    // 获取视频片段
+    // 获取视频片段（智能匹配或随机）
     // @ts-ignore
     if (appStore.renderStatus !== RenderStatus.SynthesizedSpeech) {
       return
     }
     appStore.updateRenderStatus(RenderStatus.SegmentVideo)
-    const videoSegments = await VideoManageInstance.value?.getVideoSegments({
-      duration: ttsResult.duration,
-    })!
+
+    let videoSegments: { videoFiles: string[]; timeRanges: [string, string][] } | null = null
+
+    // 尝试智能匹配选片
+    if (appStore.smartMatchEnabled && appStore.currentProduct) {
+      try {
+        let productColors: string[] = []
+        let productTags: string[] = []
+        try {
+          productColors = JSON.parse(appStore.currentProduct.colors)
+        } catch {}
+        try {
+          productTags = JSON.parse(appStore.currentProduct.tags)
+        } catch {}
+
+        if (productColors.length > 0 || productTags.length > 0) {
+          const matched = await window.electron.vlMatchVideoSegments({
+            productColors,
+            productTags,
+            targetDuration: ttsResult.duration,
+            videoPaths: appStore.videoAssets.length > 0 ? appStore.videoAssets : undefined,
+            text, // 传入文案文本用于语义对齐选片
+          })
+          // 只在匹配到足够片段时使用智能匹配结果
+          if (matched.videoFiles.length > 0) {
+            // 计算匹配到的总时长
+            let matchedDuration = 0
+            for (const [s, e] of matched.timeRanges) {
+              matchedDuration += parseFloat(e) - parseFloat(s)
+            }
+            // 如果匹配时长 >= 目标的 80%，直接使用；否则回退到随机
+            if (matchedDuration >= ttsResult.duration * 0.8) {
+              videoSegments = matched
+              console.log('使用智能匹配选片，匹配时长:', matchedDuration)
+            }
+          }
+        }
+      } catch (e) {
+        console.warn('智能匹配失败，回退到随机选片:', e)
+      }
+    }
+
+    // 回退到随机选片
+    if (!videoSegments) {
+      videoSegments =
+        (await VideoManageInstance.value?.getVideoSegments({
+          duration: ttsResult.duration,
+        })) ?? null
+    }
+
+    if (!videoSegments) {
+      throw new Error('无法获取视频片段')
+    }
+
     await new Promise((resolve) => setTimeout(resolve, random.integer(1000, 3000)))
 
     // 合成视频
@@ -173,6 +259,8 @@ const handleRenderVideo = async () => {
         appStore.renderConfig.outputPath.replace(/\\/g, '/') +
         '/' +
         appStore.renderConfig.outputFileName +
+        '_' +
+        new Date().toISOString().replace(/[-:T]/g, '').slice(0, 14) +
         appStore.renderConfig.outputFileExt,
     })
 
@@ -239,5 +327,88 @@ const handleCancelRender = () => {
 </script>
 
 <style lang="scss" scoped>
-//
+.home-workbench {
+  width: 100%;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  position: relative;
+}
+
+.home-workbench::before {
+  content: '';
+  position: absolute;
+  inset: 52px 18px 18px;
+  border-radius: 28px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.38), rgba(255, 255, 255, 0.08));
+  border: 1px solid rgba(255, 255, 255, 0.35);
+  pointer-events: none;
+  opacity: 0.7;
+}
+
+.home-titlebar {
+  width: 100%;
+  height: 38px;
+  position: relative;
+  z-index: 1;
+  border-bottom: 1px solid rgba(70, 52, 31, 0.06);
+}
+
+.home-workbench__body {
+  flex: 1;
+  min-height: 0;
+  display: grid;
+  grid-template-columns: minmax(430px, 1.12fr) minmax(360px, 0.94fr) minmax(320px, 0.8fr);
+  gap: 16px;
+  padding: 16px;
+  position: relative;
+  z-index: 1;
+}
+
+.home-column {
+  min-width: 0;
+  min-height: 0;
+}
+
+.home-column--creative {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+}
+
+.home-column--execute {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.home-column-stack {
+  min-height: 0;
+}
+
+.home-column-stack--creative-top {
+  flex: 0 0 52%;
+  min-height: 260px;
+}
+
+.home-column-stack--creative-bottom {
+  flex: 1;
+}
+
+.home-column-stack--execute-top {
+  flex: 0 0 390px;
+  min-height: 390px;
+  overflow: hidden;
+}
+
+.home-column-stack--execute-bottom {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.home-column--assets,
+.home-column--execute > :last-child {
+  min-height: 0;
+}
 </style>

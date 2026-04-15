@@ -1,6 +1,6 @@
 {
   "app": {
-    "name": "AI Short Video Factory - 短视频工厂"
+    "name": "乌鸦短视频工厂"
   },
   "menu": {
     "app": {
@@ -40,7 +40,7 @@
   },
   "common": {
     "buttons": {
-      "generate": "生成",
+      "generate": "生成文案",
       "stop": "停止",
       "config": "配置",
       "save": "保存",
@@ -49,7 +49,9 @@
       "test": "测试",
       "close": "关闭",
       "refreshAssets": "刷新素材库",
-      "copyErrorDetail": "复制报错详细信息"
+      "copyErrorDetail": "复制报错详细信息",
+      "confirm": "确认",
+      "cancel": "取消"
     },
     "states": {
       "noData": "无数据"
@@ -61,7 +63,7 @@
     }
   },
   "emptyStates": {
-    "noContent": "暂无内容",
+    "noContent": "暂无素材",
     "hintSelectFolder": "从上面选择一个包含足够分镜素材的文件夹",
     "assetsFolderEmpty": "选择的文件夹为空"
   },
@@ -72,26 +74,34 @@
     "renderConfig": "配置合成选项"
   },
   "footer": {
-    "poweredBy": "Powered by YILS（博客地址：https://yils.blog）"
+    "poweredBy": "Powered by Crow Video Factory（crow.video）"
   },
   "features": {
     "llm": {
       "config": {
-        "promptLabel": "提示词",
+        "promptLabel": "提示词(可选)",
+        "promptPlaceholder": "输入补充提示词（可选）",
         "outputLabel": "输出文案（可编辑）",
         "configTitle": "配置大语言模型接口",
         "modelName": "模型名称",
         "apiUrl": "API 地址",
         "apiKey": "API Key",
+        "language": "文案语言",
         "compatibleNote": "兼容任意 OpenAI 标准接口"
       },
       "errors": {
         "promptRequired": "提示词不能为空",
+        "apiKeyRequired": "请先配置 API Key",
         "connectionFailed": "大模型连接失败，请检查配置是否正确",
         "generateFailed": "生成失败，请检查大模型配置是否正确"
       },
       "success": {
         "connectionSucceeded": "大模型连接成功"
+      },
+      "workspace": {
+        "kicker": "创作",
+        "title": "提示词创作",
+        "note": "先设定提示词，再输出可直接编辑的短视频口播文案。"
       }
     },
     "tts": {
@@ -100,6 +110,9 @@
         "gender": "性别",
         "voice": "声音",
         "speed": "语速",
+        "apiUrl": "API 地址",
+        "apiKey": "API Key",
+        "model": "模型",
         "tryText": "试听文本",
         "tryListen": "试听",
         "selectLanguageGenderFirst": "请先选择语言和性别",
@@ -117,10 +130,16 @@
         "fileCorrupt": "语音合成失败，音频文件损坏",
         "zeroDuration": "语音时长为0秒，检查TTS语音合成配置及网络连接是否正常",
         "configInvalid": "TTS语音合成配置无效",
-        "trySynthesisNetwork": "试听语音合成失败，请检查网络"
+        "trySynthesisNetwork": "试听语音合成失败，请检查网络",
+        "apiKeyRequired": "请先配置 TTS API Key"
       },
       "info": {
         "playTryAudio": "播放试听语音"
+      },
+      "workspace": {
+        "kicker": "配音",
+        "title": "配音控制台",
+        "note": "选择音色、语种并试听当前口播内容。"
       }
     },
     "assets": {
@@ -134,18 +153,101 @@
       },
       "success": {
         "loadSucceeded": "素材读取成功"
+      },
+      "workspace": {
+        "kicker": "素材",
+        "title": "素材浏览台",
+        "note": "导入分镜素材、刷新素材库，并按需启用智能匹配。",
+        "clipsCount": "{{count}} 个片段"
       }
+    },
+    "product": {
+      "config": {
+        "title": "产品参考",
+        "nameLabel": "产品名称",
+        "namePlaceholder": "输入产品名称",
+        "imagesLabel": "产品图片",
+        "selectImages": "选择图片",
+        "featuresLabel": "功能特点",
+        "featuresPlaceholder": "如：防水、轻便、续航12小时",
+        "highlightsLabel": "产品亮点/卖点",
+        "highlightsPlaceholder": "如：行业首创XX技术，比同类产品轻50%",
+        "targetAudienceLabel": "目标受众",
+        "targetAudiencePlaceholder": "如：户外运动爱好者",
+        "analyzeAppearance": "分析外观",
+        "analyzing": "正在分析...",
+        "saveProduct": "保存产品",
+        "deleteProduct": "删除",
+        "selectProduct": "选择产品",
+        "noProduct": "暂无产品",
+        "addProduct": "添加产品",
+        "editProduct": "编辑产品",
+        "updateProduct": "更新产品",
+        "deleteConfirmTitle": "删除产品",
+        "deleteConfirmMessage": "确定要删除这个产品吗？此操作无法撤销。",
+        "colorsLabel": "识别颜色",
+        "tagsLabel": "识别标签",
+        "descriptionLabel": "外观描述"
+      },
+      "errors": {
+        "nameRequired": "请输入产品名称",
+        "imagesRequired": "请至少选择一张产品图片",
+        "saveFailed": "产品保存失败",
+        "analyzeFailed": "产品外观分析失败",
+        "deleteFailed": "产品删除失败",
+        "vlNotConfigured": "请先配置视觉大模型 API"
+      },
+      "success": {
+        "saved": "产品已保存",
+        "updated": "产品已更新",
+        "deleted": "产品已删除",
+        "analyzeCompleted": "产品外观分析完成"
+      },
+      "workspace": {
+        "kicker": "产品",
+        "title": "产品灵感台",
+        "note": "从产品特征、外观和人群定位启动文案创作。",
+        "analysisTitle": "识别摘要",
+        "emptyNote": "先选择一个产品，左侧创作链路才会完整激活。"
+      }
+    },
+    "vl": {
+      "config": {
+        "title": "视觉大模型配置",
+        "modelName": "模型名称",
+        "apiUrl": "API 地址",
+        "apiKey": "API Key",
+        "note": "兼容 OpenAI Vision API 格式（如 qwen-vl）"
+      },
+      "errors": {
+        "connectionFailed": "视觉大模型连接失败"
+      },
+      "success": {
+        "connectionSucceeded": "视觉大模型连接成功"
+      }
+    },
+    "analysis": {
+      "analyzeAssets": "分析素材库",
+      "analyzing": "正在分析素材...",
+      "analysisStarted": "开始分析素材库",
+      "analysisComplete": "素材库分析完成",
+      "analysisCancelled": "已取消分析",
+      "analysisFailed": "分析素材失败",
+      "stats": "已分析 {{analyzed}}/{{total}} 个视频",
+      "smartMatch": "智能匹配",
+      "randomMode": "随机模式",
+      "clearAnalysis": "清除分析数据"
     },
     "render": {
       "config": {
-        "startLabel": "开始合成",
-        "stopLabel": "停止合成",
-        "autoBatch": "自动批量合成",
+        "startLabel": "开始生成",
+        "stopLabel": "停止生成",
+        "autoBatch": "自动批量生成",
         "bgmFolderLabel": "背景音乐文件夹（随机选取.mp3，为空则无背景音）",
         "output": {
           "width": "导出视频宽度",
           "height": "导出视频高度",
-          "fileName": "导出文件名",
+          "fileName": "文件名前缀",
           "format": "导出格式",
           "folder": "导出文件夹"
         }
@@ -172,6 +274,13 @@
       "info": {
         "batchNext": "开始合成下一个",
         "canceled": "视频合成已终止"
+      },
+      "workspace": {
+        "kicker": "生成",
+        "title": "生成控制塔",
+        "note": "确认状态后开始合成，右侧区域只负责执行与反馈。",
+        "runningHint": "当前流程正在执行中。",
+        "idleHint": "准备完成后即可开始生成。"
       }
     }
   }

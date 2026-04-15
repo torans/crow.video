@@ -43,7 +43,7 @@ export async function renderVideo(
       path
         .join(
           path.dirname(getTempTtsVoiceFilePath()),
-          path.basename(getTempTtsVoiceFilePath(), '.mp3') + '.srt',
+          path.basename(getTempTtsVoiceFilePath(), '.wav') + '.srt',
         )
         .replace(/\\/g, '/')
 
@@ -90,8 +90,11 @@ export async function renderVideo(
     // 重置时间基、帧率、色彩空间
     filters.push(`[vconcat]fps=30,format=yuv420p,setpts=PTS-STARTPTS[vout]`)
 
-    // 在视频拼接后添加字幕
-    filters.push(`[vout]subtitles=${subtitleFile.replace(/\:/g, '\\\\:')}[with_subs]`)
+    // 在视频拼接后添加字幕（仅当字幕文件存在时）
+    const hasSubtitle = fs.existsSync(subtitleFile)
+    if (hasSubtitle) {
+      filters.push(`[vout]subtitles=${subtitleFile.replace(/\:/g, '\\\\:')}[with_subs]`)
+    }
 
     // 音频处理：使用响度归一化(loudnorm)确保音量均衡
     const voiceStreamIdx = videoFiles.length
@@ -136,7 +139,8 @@ export async function renderVideo(
     args.push('-filter_complex', `${filters.join(';')}`)
 
     // 映射输出流
-    args.push('-map', '[with_subs]', '-map', '[final_audio]')
+    const videoOut = hasSubtitle ? '[with_subs]' : '[vout]'
+    args.push('-map', videoOut, '-map', '[final_audio]')
 
     // 编码参数
     args.push(

@@ -1,6 +1,6 @@
 import { defineStore } from 'pinia'
-import { computed, ref } from 'vue'
-import { EdgeTTSVoice } from '~/electron/lib/edge-tts'
+import { ref } from 'vue'
+import type { ProductReferenceRecord } from '~/electron/vl/types'
 
 export enum RenderStatus {
   None,
@@ -22,11 +22,12 @@ export const useAppStore = defineStore(
     }
 
     // 大模型文案生成
-    const prompt = ref('')
+    const prompt = ref('无')
     const llmConfig = ref({
-      modelName: '',
-      apiUrl: '',
+      modelName: 'deepseek-chat',
+      apiUrl: 'https://api.deepseek.com/v1',
       apiKey: '',
+      language: '中文',
     })
     const updateLLMConfig = (newConfig: typeof llmConfig.value) => {
       llmConfig.value = newConfig
@@ -35,37 +36,28 @@ export const useAppStore = defineStore(
     // 视频素材管理
     const videoAssetsFolder = ref('')
     const videoExportFolder = ref('')
+    // 素材文件路径列表，用于智能匹配选片时限定范围
+    const videoAssets = ref<string[]>([])
 
-    // 语音合成
-    const originalVoicesList = ref<EdgeTTSVoice[]>([])
-    const languageList = computed(() => {
-      return originalVoicesList.value
-        .map((voice) => voice.FriendlyName.split(' - ').pop()?.split(' (').shift())
-        .filter((language) => !!language)
-        .filter((language, index, arr) => arr.indexOf(language) === index)
+    // 语音合成（Qwen TTS）
+    const ttsConfig = ref({
+      apiKey: '',
+      apiUrl: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
+      model: 'qwen3-tts-flash',
+      voice: 'Cherry',
+      languageType: 'Chinese',
     })
-    const genderList = ref([
-      { label: '男性', value: 'Male' },
-      { label: '女性', value: 'Female' },
-      // { label: '中性', value: 'Neutral' },
-    ])
-    const speedList = ref([
-      { label: '慢', value: -30 },
-      { label: '中', value: 0 },
-      { label: '快', value: 30 },
-    ])
-    const language = ref<string>()
-    const gender = ref<string>()
-    const voice = ref<EdgeTTSVoice | null>(null)
-    const speed = ref(0)
-    const tryListeningText = ref('Hello，欢迎使用短视频工厂！')
+    const updateTtsConfig = (newConfig: typeof ttsConfig.value) => {
+      ttsConfig.value = newConfig
+    }
+    const tryListeningText = ref('Hello，欢迎使用乌鸦视频工厂！')
 
     // 合成配置
     const renderConfig = ref({
       bgmPath: '',
       outputSize: { width: 1080, height: 1920 },
       outputPath: '',
-      outputFileName: '',
+      outputFileName: 'crow-video',
       outputFileExt: '.mp4',
     })
     const autoBatch = ref(false)
@@ -77,6 +69,29 @@ export const useAppStore = defineStore(
       renderStatus.value = newStatus
     }
 
+    // VL 视觉大模型配置
+    const vlConfig = ref({
+      apiUrl: 'https://dashscope.aliyuncs.com/compatible-mode/v1',
+      apiKey: '',
+      modelName: 'qwen-vl-plus',
+    })
+    const updateVLConfig = (newConfig: typeof vlConfig.value) => {
+      vlConfig.value = newConfig
+    }
+
+    // 产品参考管理
+    const currentProductId = ref<string | null>(null)
+    const currentProduct = ref<ProductReferenceRecord | null>(null)
+    const updateCurrentProduct = (product: ProductReferenceRecord | null) => {
+      currentProduct.value = product
+      currentProductId.value = product?.id ?? null
+    }
+
+    // 智能匹配
+    const smartMatchEnabled = ref(false)
+    const analysisStatus = ref<'idle' | 'analyzing' | 'done'>('idle')
+    const analysisProgress = ref({ current: 0, total: 0 })
+
     return {
       locale,
       updateLocale,
@@ -87,15 +102,10 @@ export const useAppStore = defineStore(
 
       videoAssetsFolder,
       videoExportFolder,
+      videoAssets,
 
-      originalVoicesList,
-      languageList,
-      genderList,
-      speedList,
-      language,
-      gender,
-      voice,
-      speed,
+      ttsConfig,
+      updateTtsConfig,
       tryListeningText,
 
       renderConfig,
@@ -103,11 +113,20 @@ export const useAppStore = defineStore(
       renderStatus,
       updateRenderConfig,
       updateRenderStatus,
+
+      vlConfig,
+      updateVLConfig,
+      currentProductId,
+      currentProduct,
+      updateCurrentProduct,
+      smartMatchEnabled,
+      analysisStatus,
+      analysisProgress,
     }
   },
   {
     persist: {
-      omit: ['genderList', 'speedList', 'autoBatch', 'renderStatus'],
+      omit: ['autoBatch', 'renderStatus', 'analysisStatus', 'analysisProgress', 'currentProduct'],
     },
   },
 )

@@ -89,8 +89,9 @@ const handleClose = () => {
   height: 100vh;
   overflow: hidden;
   position: relative;
+  background: var(--apple-bg);
 
-  --title-bar-height: 40px;
+  --title-bar-height: 38px;
 
   .logo {
     position: absolute;
@@ -98,17 +99,25 @@ const handleClose = () => {
     top: 0;
     left: 0;
     height: var(--title-bar-height);
-    padding-left: 15px;
+    padding-left: 14px;
     display: flex;
     align-items: center;
     gap: 8px;
-    font-size: 14px;
+    font-size: 12.5px;
+    font-weight: 600;
+    letter-spacing: -0.01em;
+    color: var(--apple-text);
     user-select: none;
     -webkit-app-region: drag;
 
     img {
-      width: 20px;
-      height: 20px;
+      width: 18px;
+      height: 18px;
+      border-radius: 4px;
+    }
+
+    span {
+      opacity: 0.7;
     }
   }
 
@@ -119,26 +128,31 @@ const handleClose = () => {
     right: 0;
     display: flex;
     align-items: center;
-    font-size: 14px;
+    font-size: 13px;
     user-select: none;
 
     .control-btn {
-      transition: all 0.1s;
+      transition: all 0.15s ease;
       display: flex;
       align-items: center;
       justify-content: center;
-      gap: 5px;
-      width: 42px;
+      width: 40px;
       height: var(--title-bar-height);
       box-sizing: border-box;
+      color: var(--apple-text);
+      opacity: 0.4;
+      border-radius: 0;
 
       &:hover {
-        @apply bg-gray-200;
+        opacity: 0.8;
+        background: rgba(0, 0, 0, 0.04);
       }
 
       &-close {
         &:hover {
-          @apply text-white bg-red-600;
+          opacity: 1;
+          color: white;
+          background: #ff5f57;
         }
       }
     }
