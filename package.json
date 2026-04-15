@@ -1,12 +1,12 @@
 {
   "name": "crow-video",
-  "description": "乌鸦视频工厂，一键生成产品营销与泛内容短视频，AI批量自动剪辑",
-  "version": "1.2.2",
+  "description": "乌鸦视频工厂,全自动生成带货视频，上传商品即出片，支持批量创作日产1000+条，抖店/快手/TikTok卖家必备。",
+  "version": "1.0.0",
   "author": {
-    "name": "YILS",
-    "developer": "YILS",
-    "email": "yils_lin@163.com",
-    "url": "https://yils.blog/"
+    "name": "兰秋",
+    "developer": "兰秋",
+    "email": "jran8697@gmail.com",
+    "url": "https://lanqiu.tech/"
   },
   "homepage": "https://crow.video",
   "main": "dist-electron/main.js",
