@@ -95,5 +95,5 @@ jobs:
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            release/**/*.dmg
-            release/**/*.exe
+            ./*.dmg
+            ./*-setup.exe
