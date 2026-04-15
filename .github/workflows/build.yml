@@ -89,7 +89,7 @@ jobs:
           path: .
 
       - name: List files
-        run:          find . -name "*.dmg" -o -name "*.exe" | head -20
+        run: find . -name "*.dmg" -o -name "*.exe"
 
       - name: Upload artifacts to release
         uses: softprops/action-gh-release@v2
