@@ -6,12 +6,8 @@ on:
       - 'v*'
 
 jobs:
-  release:
-    runs-on: ${{ matrix.os }}
-
-    strategy:
-      matrix:
-        os: [macos-latest, windows-latest]
+  build-macos:
+    runs-on: macos-latest
 
     steps:
       - name: Check out Git repository
@@ -27,9 +23,7 @@ jobs:
           npm install -g pnpm@10.12.4
           pnpm install
 
-      # MacOS Build
       - name: Build MacOS
-        if: matrix.os == 'macos-latest'
         run: |
           export ELECTRON_BUILDER_EXTRA_ARGS="--universal"
           pnpm run lipo-ffmpeg
@@ -39,36 +33,72 @@ jobs:
           CSC_IDENTITY_AUTO_DISCOVERY: false
           DEBUG: electron-builder
 
-      # Windows Build
+      - name: Upload Mac artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-build
+          path: release/**/*.dmg
+
+  build-windows:
+    runs-on: windows-latest
+
+    steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
+      - name: Install Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: '22.17.0'
+
+      - name: Install Dependencies
+        run: |
+          npm install -g pnpm@10.12.4
+          pnpm install
+
       - name: Build Windows
-        if: matrix.os == 'windows-latest'
         run: pnpm run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # Get version from tag
+      - name: Upload Windows artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-build
+          path: release/**/*.exe
+
+  release:
+    needs: [build-macos, build-windows]
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Download Mac artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: macos-build
+          path: release
+
+      - name: Download Windows artifact
+        uses: actions/download-artifact@v4
+        with:
+          name: windows-build
+          path: release
+
       - name: Get version from tag
         id: get_version
         run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
-        shell: bash
 
-      # Read release notes
       - name: Read release notes
-        id: release_notes
         run: |
           NOTES=$(awk "/## \[v${{ env.VERSION }}\]/{p=1;print;next} /## \[v/{p=0}p" CHANGELOG.md)
           echo "NOTES<<EOF" >> $GITHUB_ENV
           echo "$NOTES" >> $GITHUB_ENV
           echo "EOF" >> $GITHUB_ENV
-        shell: bash
 
-      # Publish Release
       - name: Publish Release
         uses: softprops/action-gh-release@v2
         with:
-          files: |
-            release/${{ env.VERSION }}/*.dmg
-            release/${{ env.VERSION }}/*.exe
+          files: release/**/*.dmg release/**/*.exe
           body: ${{ env.NOTES }}
           draft: false
           prerelease: false
