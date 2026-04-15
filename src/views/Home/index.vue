@@ -191,20 +191,26 @@ const handleRenderVideo = async () => {
       try {
         let productColors: string[] = []
         let productTags: string[] = []
+        let productSceneTags: string[] = []
         try {
           productColors = JSON.parse(appStore.currentProduct.colors)
         } catch {}
         try {
           productTags = JSON.parse(appStore.currentProduct.tags)
         } catch {}
+        try {
+          productSceneTags = JSON.parse(appStore.currentProduct.scene_tags || '[]')
+        } catch {}
 
         if (productColors.length > 0 || productTags.length > 0) {
           const matched = await window.electron.vlMatchVideoSegments({
             productColors,
             productTags,
+            productSceneTags,
             targetDuration: ttsResult.duration,
-            videoPaths: appStore.videoAssets.length > 0 ? appStore.videoAssets : undefined,
-            text, // 传入文案文本用于语义对齐选片
+            videoPaths: appStore.videoAssets.length > 0 ? JSON.parse(JSON.stringify(appStore.videoAssets)) : undefined,
+            text,
+            matchMode: appStore.renderConfig.matchMode ?? 'auto',
           })
           // 只在匹配到足够片段时使用智能匹配结果
           if (matched.videoFiles.length > 0) {

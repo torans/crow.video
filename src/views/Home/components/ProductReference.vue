@@ -208,6 +208,15 @@
             density="compact"
             hide-details
           />
+
+          <v-text-field
+            v-model="newProduct.sceneTags"
+            label="场景标签"
+            placeholder="如：钓鱼、户外、抛竿、收线（逗号分隔）"
+            density="compact"
+            hide-details
+            class="mt-2"
+          />
         </v-card-text>
         <v-divider />
         <v-card-actions>
@@ -340,10 +349,11 @@ const newProduct = ref({
   features: '',
   highlights: '',
   targetAudience: '',
+  sceneTags: '', // 场景标签，逗号分隔
 })
 
 const resetNewProduct = () => {
-  newProduct.value = { name: '', imagePaths: [], features: '', highlights: '', targetAudience: '' }
+  newProduct.value = { name: '', imagePaths: [], features: '', highlights: '', targetAudience: '', sceneTags: '' }
 }
 
 const handleCloseAddDialog = () => {
@@ -363,6 +373,14 @@ const handleEditProduct = () => {
     features: appStore.currentProduct.features || '',
     highlights: appStore.currentProduct.highlights || '',
     targetAudience: appStore.currentProduct.target_audience || '',
+    sceneTags: (() => {
+      try {
+        const tags = JSON.parse(appStore.currentProduct.scene_tags || '[]')
+        return Array.isArray(tags) ? tags.join('、') : ''
+      } catch {
+        return ''
+      }
+    })(),
   }
   showAddDialog.value = true
 }
@@ -387,6 +405,9 @@ const handleSaveProduct = async () => {
   }
 
   saveLoading.value = true
+  const sceneTags = newProduct.value.sceneTags
+    ? newProduct.value.sceneTags.split(',').map((s: string) => s.trim()).filter(Boolean)
+    : []
   try {
     if (isEditing.value && editingProductId.value) {
       await window.electron.vlUpdateProductReference({
@@ -396,6 +417,7 @@ const handleSaveProduct = async () => {
         features: newProduct.value.features,
         highlights: newProduct.value.highlights,
         targetAudience: newProduct.value.targetAudience,
+        sceneTags,
       })
       toast.success(t('features.product.success.updated'))
     } else {
@@ -405,6 +427,7 @@ const handleSaveProduct = async () => {
         features: newProduct.value.features,
         highlights: newProduct.value.highlights,
         targetAudience: newProduct.value.targetAudience,
+        sceneTags,
       })
       toast.success(t('features.product.success.saved'))
     }

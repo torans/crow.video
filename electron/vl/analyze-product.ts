@@ -63,6 +63,7 @@ export async function saveProductReference(product: {
   description?: string
   colors?: string[]
   tags?: string[]
+  sceneTags?: string[]
 }): Promise<string> {
   const id = crypto.randomUUID()
   await sqInsert({
@@ -77,6 +78,7 @@ export async function saveProductReference(product: {
       description: product.description || '',
       colors: JSON.stringify(product.colors || []),
       tags: JSON.stringify(product.tags || []),
+      scene_tags: JSON.stringify(product.sceneTags || []),
       created_at: Date.now(),
     },
   })
@@ -97,6 +99,7 @@ export async function updateProductReference(
     description?: string
     colors?: string[]
     tags?: string[]
+    sceneTags?: string[]
   },
 ): Promise<void> {
   await sqUpdate({
@@ -110,6 +113,7 @@ export async function updateProductReference(
       description: product.description || '',
       colors: JSON.stringify(product.colors || []),
       tags: JSON.stringify(product.tags || []),
+      scene_tags: JSON.stringify(product.sceneTags || []),
     },
     condition: `id = '${id.replace(/'/g, "''")}'`,
   })

@@ -1,3 +1,6 @@
+import fs from 'node:fs'
+import path from 'node:path'
+import os from 'node:os'
 import { sqQuery } from '../sqlite'
 import type {
   MatchVideoSegmentsParams,
@@ -5,6 +8,40 @@ import type {
   MatchedSegment,
   VideoFrameAnalysisRecord,
 } from './types'
+
+// ============================================================
+// 调试日志：写入文件
+// ============================================================
+
+function getMatchLogPath(): string {
+  return path.join(os.tmpdir(), `crow_match_${new Date().toISOString().slice(0, 13).replace('T', '_')}.log`)
+}
+
+interface LogEntry {
+  ts: string
+  phase: string
+  [key: string]: unknown
+}
+
+function matchLog(phase: string, data: Record<string, unknown> = {}): void {
+  const entry: LogEntry = {
+    ts: new Date().toISOString(),
+    phase,
+    ...data,
+  }
+  const line = JSON.stringify(entry) + '\n'
+  const logPath = getMatchLogPath()
+  try {
+    fs.appendFileSync(logPath, line, 'utf-8')
+    console.log(`[matchLog] 写入成功: ${logPath}, phase=${phase}`)
+  } catch (err) {
+    console.error(`[matchLog] 写入失败: ${logPath}, phase=${phase}, error=`, err)
+  }
+}
+
+// ============================================================
+// 评分函数
+// ============================================================
 
 /**
  * 计算帧颜色对产品颜色的覆盖率（核心匹配指标）
@@ -58,7 +95,7 @@ function tagMatchScore(productTags: string[], frameTags: string[]): number {
  *
  * 颜色权重 0.4，标签权重 0.6
  *
- * 【修复方案 A：硬淘汰机制】
+ * 【硬淘汰机制】
  * - 如果颜色覆盖率太低（低于 0.34），说明严重串色，直接一票否决，返回 0
  */
 function computeScore(
@@ -76,7 +113,7 @@ function computeScore(
 
   const pSet = new Set(productColors.map((c) => c.toLowerCase()))
   let productCoverage = 0
-  
+
   if (productColors.length > 0) {
     const fSet = new Set(frameColors.map((c) => c.toLowerCase()))
     let matched = 0
@@ -85,9 +122,7 @@ function computeScore(
     }
     productCoverage = matched / pSet.size
 
-    // 【新增核心修复：硬淘汰】
-    // 覆盖率低于 34% (意味着 3 个产品色连 1 个都没匹配上，或者全是冲突色)，直接毙掉
-    // 阈值可以根据实际业务调整，如果要求更严，可以改为 0.5
+    // 【硬淘汰】覆盖率低于 34% 直接毙掉
     if (productCoverage < 0.34) {
       return 0
     }
@@ -99,6 +134,26 @@ function computeScore(
     : 1.0
 
   return base * tagPenalty * colorPenalty
+}
+
+/**
+ * 场景模式打分：跳过颜色硬淘汰，用场景标签匹配
+ * 语义权重更高（0.7 vs 0.4）
+ */
+function computeSceneScore(
+  productSceneTags: string[],
+  frameColors: string[],
+  frameTags: string[],
+): number {
+  const tScore = tagMatchScore(productSceneTags, frameTags)
+  // 场景模式：无颜色硬淘汰，颜色惩罚也轻
+  const cScore = colorMatchScore([], frameColors)
+  const base = cScore * 0.2 + tScore * 0.8
+
+  // 标签惩罚
+  const tagPenalty = tScore > 0 ? 1.0 : 0.05
+
+  return base * tagPenalty
 }
 
 // ============================================================
@@ -209,6 +264,8 @@ function descriptionRelevance(keywords: string[], frameDescription: string): num
 
 interface ScoredFrame extends MatchedSegment {
   description: string
+  frameColors: string[]
+  frameTags: string[]
 }
 
 // ============================================================
@@ -221,15 +278,51 @@ interface ScoredFrame extends MatchedSegment {
 export async function matchVideoSegments(
   params: MatchVideoSegmentsParams,
 ): Promise<MatchVideoSegmentsResult> {
+  console.log('[matchVideoSegments] 函数被调用！')
   const {
     productColors,
     productTags,
+    productSceneTags = [],
     targetDuration,
     videoPaths,
     text,
     minSegmentDuration = 2,
     maxSegmentDuration = 15,
+    matchMode = 'auto',
   } = params
+
+  // 场景模式判断逻辑：
+  // 'scene' = 强制场景模式
+  // 'product' = 强制产品模式（严格颜色+标签）
+  // 'auto' = 自动检测，有场景标签则用场景模式
+  const isSceneMode = matchMode === 'scene' || (matchMode === 'auto' && productSceneTags.length > 0)
+  console.log(`[matchVideoSegments] 模式: ${isSceneMode ? '场景' : '产品'}模式 (matchMode=${matchMode}, sceneTags=${productSceneTags.length})`)
+
+  console.log('[matchVideoSegments] 调用了！productColors=', productColors, 'productTags=', productTags)
+  const logPath = getMatchLogPath()
+  try {
+    fs.writeFileSync(logPath, `[${new Date().toISOString()}] matchVideoSegments 调用\n`)
+    fs.appendFileSync(logPath, `productColors=${JSON.stringify(productColors)}\n`)
+    fs.appendFileSync(logPath, `productTags=${JSON.stringify(productTags)}\n`)
+    fs.appendFileSync(logPath, `targetDuration=${targetDuration}\n`)
+    fs.appendFileSync(logPath, `text=${text}\n`)
+    fs.appendFileSync(logPath, `videoPaths count=${videoPaths?.length ?? 'all'}\n`)
+    console.log(`[matchVideoSegments] 日志文件写入成功: ${logPath}`)
+  } catch (err) {
+    console.error(`[matchVideoSegments] 日志文件写入失败: ${logPath}, error=`, err)
+  }
+  matchLog('START', {
+    productColors,
+    productTags,
+    productSceneTags,
+    matchMode,
+    isSceneMode,
+    targetDuration,
+    videoPaths,
+    text,
+    minSegmentDuration,
+    maxSegmentDuration,
+  })
 
   let frames: VideoFrameAnalysisRecord[]
   if (videoPaths && videoPaths.length > 0) {
@@ -244,12 +337,22 @@ export async function matchVideoSegments(
     })) as VideoFrameAnalysisRecord[]
   }
 
+  matchLog('FRAMES_LOADED', { totalFrames: frames.length, frames: frames.map(f => ({
+    videoPath: f.video_path,
+    timestamp: f.timestamp,
+    description: f.description,
+    colors: f.colors,
+    tags: f.tags,
+  }))})
+
   if (frames.length === 0) {
+    matchLog('NO_FRAMES')
     return { videoFiles: [], timeRanges: [] }
   }
 
-  // Score each frame (product-level matching)
-  const scoredFrames: ScoredFrame[] = frames.map((frame) => {
+  // Score each frame (product-level or scene-level matching)
+  const scoredFrames: ScoredFrame[] = []
+  for (const frame of frames) {
     let frameColors: string[] = []
     let frameTags: string[] = []
     try {
@@ -259,14 +362,47 @@ export async function matchVideoSegments(
       frameTags = JSON.parse(frame.tags)
     } catch {}
 
-    return {
+    let score: number
+    if (isSceneMode) {
+      // 场景模式：用场景标签打分，跳过颜色硬淘汰
+      score = computeSceneScore(productSceneTags, frameColors, frameTags)
+    } else {
+      // 产品模式：严格颜色+标签双重匹配
+      score = computeScore(productColors, productTags, frameColors, frameTags)
+    }
+    scoredFrames.push({
       videoPath: frame.video_path,
       timestamp: frame.timestamp,
-      score: computeScore(productColors, productTags, frameColors, frameTags),
+      score,
       appeal: frame.appeal ?? 5,
       description: frame.description || '',
-    }
-  }).filter((f) => f.score > 0) // 【新增核心修复】：得分为0的垃圾素材直接在这里被物理隔离，绝缘于后续的语义和吸引力提分阶段！
+      frameColors,
+      frameTags,
+    })
+  }
+
+  matchLog('FRAMES_SCORED', {
+    allScores: scoredFrames.map(f => ({
+      videoPath: path.basename(f.videoPath),
+      timestamp: f.timestamp,
+      score: f.score,
+      appeal: f.appeal,
+      description: f.description,
+      frameColors: f.frameColors,
+      frameTags: f.frameTags,
+    }))
+  })
+
+  const filteredFrames = scoredFrames.filter((f) => f.score > 0)
+  matchLog('FRAMES_FILTERED', {
+    passedCount: filteredFrames.length,
+    passed: filteredFrames.map(f => ({
+      videoPath: path.basename(f.videoPath),
+      timestamp: f.timestamp,
+      score: f.score,
+      description: f.description,
+    }))
+  })
 
   // Shared state
   const result: MatchVideoSegmentsResult = {
@@ -279,7 +415,8 @@ export async function matchVideoSegments(
 
   const tryAddSegment = (candidate: ScoredFrame, slotRemaining?: number): boolean => {
     const globalRemaining = targetDuration - currentDuration
-    const remaining = slotRemaining !== undefined ? Math.min(slotRemaining, globalRemaining) : globalRemaining
+    // 放宽限制：允许轻微超出 targetDuration（最多超出 20%）
+    const remaining = slotRemaining !== undefined ? Math.min(slotRemaining, globalRemaining * 1.2) : globalRemaining * 1.2
     if (remaining <= 0) return false
 
     const segDuration = Math.min(
@@ -308,15 +445,11 @@ export async function matchVideoSegments(
 
   // Fallback 池：要求至少 50% 产品颜色覆盖率
   const buildFallbackPool = (): ScoredFrame[] => {
-    if (productColors.length === 0) return scoredFrames
+    if (productColors.length === 0) return filteredFrames
 
     const pSet = new Set(productColors.map((c) => c.toLowerCase()))
-    const colorMatched = scoredFrames.filter((f) => {
-      const frame = frames.find(fr => fr.video_path === f.videoPath && fr.timestamp === f.timestamp)
-      if (!frame) return false
-      let frameColors: string[] = []
-      try { frameColors = JSON.parse(frame.colors) } catch {}
-      const fSet = new Set(frameColors.map((c) => c.toLowerCase()))
+    const colorMatched = filteredFrames.filter((f) => {
+      const fSet = new Set(f.frameColors.map((c) => c.toLowerCase()))
       let matched = 0
       for (const color of pSet) {
         if (fSet.has(color)) matched++
@@ -324,78 +457,172 @@ export async function matchVideoSegments(
       return matched / pSet.size >= 0.5
     })
 
-    return colorMatched.length > 0 ? colorMatched : scoredFrames
+    return colorMatched.length > 0 ? colorMatched : filteredFrames
   }
 
   // === Semantic alignment mode (when text is provided) ===
   if (text && text.trim().length > 0) {
     const sentences = splitSentences(text, targetDuration)
-    console.log(`[智能选片] 语义对齐模式，${sentences.length} 个句子时间段`)
+    matchLog('SEMANTIC_MODE', { sentenceCount: sentences.length, sentences: sentences.map(s => ({
+      text: s.text,
+      start: s.start,
+      end: s.end,
+      duration: s.end - s.start,
+    }))})
 
-    for (let i = 0; i < sentences.length; i++) {
+    // 按时间段长度降序排列，优先填大 slot，避免贪心算法导致大 slot 最后只能选差候选
+    const sortedIndices = sentences
+      .map((s, i) => ({ i, dur: s.end - s.start }))
+      .sort((a, b) => b.dur - a.dur)
+
+    for (const { i } of sortedIndices) {
       const slot = sentences[i]
       const slotDuration = slot.end - slot.start
       const keywords = extractKeywords(slot.text)
 
-      console.log(`[智能选片] 句${i + 1}: "${slot.text.slice(0, 30)}..." | ${trunc3(slot.start)}s~${trunc3(slot.end)}s | 关键词: ${keywords.slice(0, 6).join(',')}`)
-
-      const ranked = scoredFrames
+      const ranked = filteredFrames
         .map((f) => {
           const semantic = descriptionRelevance(keywords, f.description)
-          const combined = f.score * 0.6 + semantic * 0.4
+          // 场景模式：语义权重 0.8；产品模式：语义权重 0.4
+          const semanticWeight = isSceneMode ? 0.8 : 0.4
+          const combined = f.score * (1 - semanticWeight) + semantic * semanticWeight
           return { ...f, combined, semantic }
         })
-        .sort((a, b) => {
-          if (i === 0) {
-            const aFinal = a.combined * 0.6 + (a.appeal / 10) * 0.4
-            const bFinal = b.combined * 0.6 + (b.appeal / 10) * 0.4
-            return bFinal - aFinal
-          }
-          return b.combined - a.combined
-        })
+        .sort((a, b) => b.combined - a.combined)
+
+      matchLog('SLOT_RANKED', {
+        slotIndex: i,
+        slotText: slot.text,
+        slotStart: slot.start,
+        slotEnd: slot.end,
+        slotDuration,
+        keywords,
+        candidates: ranked.slice(0, 10).map(f => ({
+          videoPath: path.basename(f.videoPath),
+          timestamp: f.timestamp,
+          score: f.score,
+          semantic: f.semantic,
+          combined: f.combined,
+          appeal: f.appeal,
+          finalScore: f.finalScore,
+          description: f.description,
+        }))
+      })
 
       let slotFilled = 0
       for (const candidate of ranked) {
-        if (slotFilled >= slotDuration || currentDuration >= targetDuration) break
+        // 只要当前时长未超过 targetDuration 的 120%，就继续尝试填入
+        if (slotFilled >= slotDuration || currentDuration >= targetDuration * 1.2) break
         const slotRemaining = slotDuration - slotFilled
         const beforeDur = currentDuration
         if (tryAddSegment(candidate, slotRemaining)) {
-          slotFilled += currentDuration - beforeDur
-          if (candidate.semantic > 0) {
-            console.log(`[智能选片]   语义命中: score=${trunc3(candidate.combined)} semantic=${trunc3(candidate.semantic)}`)
-          }
+          const filled = currentDuration - beforeDur
+          slotFilled += filled
+          matchLog('SEGMENT_SELECTED', {
+            slotIndex: i,
+            videoPath: candidate.videoPath,
+            timestamp: candidate.timestamp,
+            segStart: result.timeRanges[result.timeRanges.length - 1][0],
+            segEnd: result.timeRanges[result.timeRanges.length - 1][1],
+            filledDuration: filled,
+            score: candidate.score,
+            semantic: candidate.semantic,
+            appeal: candidate.appeal,
+            description: candidate.description,
+          })
+        }
+      }
+
+      if (slotFilled < slotDuration) {
+        matchLog('SLOT_UNDERFILLED', {
+          slotIndex: i,
+          slotText: slot.text,
+          requestedDuration: slotDuration,
+          filledDuration: slotFilled,
+          remaining: targetDuration - currentDuration,
+        })
+      }
+    }
+
+    if (currentDuration < targetDuration * 1.2) {
+      // Fallback 时用全文本算 semantic，只留 > 0 的帧，确保不相关帧不会混进来
+      const fullKeywords = extractKeywords(text)
+      const fallbackPool = filteredFrames
+        .filter(f => {
+          const sem = descriptionRelevance(fullKeywords, f.description)
+          return sem > 0
+        })
+        .sort((a, b) => b.score - a.score)
+      // 如果过滤后为空（没有任何帧语义相关），才用全部 filteredFrames 按 score 排序
+      const finalPool = fallbackPool.length > 0 ? fallbackPool : buildFallbackPool()
+      finalPool.sort((a, b) => b.score - a.score)
+      matchLog('FALLBACK_FILL', {
+        poolSize: finalPool.length,
+        remainingDuration: targetDuration - currentDuration,
+        pool: finalPool.slice(0, 5).map(f => ({
+          videoPath: path.basename(f.videoPath),
+          timestamp: f.timestamp,
+          score: f.score,
+        }))
+      })
+      for (const candidate of finalPool) {
+        if (currentDuration >= targetDuration) break
+        const beforeDur = currentDuration
+        if (tryAddSegment(candidate)) {
+          matchLog('FALLBACK_SELECTED', {
+            videoPath: candidate.videoPath,
+            segStart: result.timeRanges[result.timeRanges.length - 1][0],
+            segEnd: result.timeRanges[result.timeRanges.length - 1][1],
+            filledDuration: currentDuration - beforeDur,
+            score: candidate.score,
+          })
         }
       }
     }
 
-    if (currentDuration < targetDuration) {
-      const fallbackPool = buildFallbackPool()
-      fallbackPool.sort((a, b) => b.score - a.score)
-      console.log(`[智能选片] 补充填充，使用${fallbackPool === scoredFrames ? '全部' : '同色'}素材池`)
-      for (const candidate of fallbackPool) {
-        if (currentDuration >= targetDuration) break
-        tryAddSegment(candidate)
-      }
-    }
-
+    matchLog('RESULT', {
+      videoFiles: result.videoFiles.map(f => path.basename(f)),
+      timeRanges: result.timeRanges,
+      totalDuration: currentDuration,
+      targetDuration,
+    })
     return result
   }
 
   // === Legacy mode (no text, backward compatible) ===
-  scoredFrames.sort((a, b) => b.score - a.score)
+  filteredFrames.sort((a, b) => b.score - a.score)
 
-  const top30Count = Math.max(1, Math.ceil(scoredFrames.length * 0.3))
-  const top30Frames = scoredFrames.slice(0, top30Count)
+  const top30Count = Math.max(1, Math.ceil(filteredFrames.length * 0.3))
+  const top30Frames = filteredFrames.slice(0, top30Count)
   top30Frames.sort((a, b) => {
     const aFinal = a.score * 0.5 + (a.appeal / 10) * 0.5
     const bFinal = b.score * 0.5 + (b.appeal / 10) * 0.5
     return bFinal - aFinal
   })
 
+  matchLog('LEGACY_MODE', {
+    top30Count,
+    candidates: top30Frames.map(f => ({
+      videoPath: path.basename(f.videoPath),
+      timestamp: f.timestamp,
+      score: f.score,
+      appeal: f.appeal,
+    }))
+  })
+
   // Phase 1: Golden 3s
   for (const candidate of top30Frames) {
     if (currentDuration >= targetDuration) break
-    if (tryAddSegment(candidate)) break
+    if (tryAddSegment(candidate)) {
+      matchLog('PHASE1_GOLDEN_SELECTED', {
+        videoPath: candidate.videoPath,
+        segStart: result.timeRanges[result.timeRanges.length - 1][0],
+        segEnd: result.timeRanges[result.timeRanges.length - 1][1],
+        score: candidate.score,
+        appeal: candidate.appeal,
+      })
+      break
+    }
   }
 
   // Phase 2: Fill remaining
@@ -403,9 +630,24 @@ export async function matchVideoSegments(
   fallbackPool.sort((a, b) => b.score - a.score)
   for (const candidate of fallbackPool) {
     if (currentDuration >= targetDuration) break
-    tryAddSegment(candidate)
+    const beforeDur = currentDuration
+    if (tryAddSegment(candidate)) {
+      matchLog('PHASE2_FALLBACK_SELECTED', {
+        videoPath: candidate.videoPath,
+        segStart: result.timeRanges[result.timeRanges.length - 1][0],
+        segEnd: result.timeRanges[result.timeRanges.length - 1][1],
+        filledDuration: currentDuration - beforeDur,
+        score: candidate.score,
+      })
+    }
   }
 
+  matchLog('RESULT', {
+    videoFiles: result.videoFiles.map(f => path.basename(f)),
+    timeRanges: result.timeRanges,
+    totalDuration: currentDuration,
+    targetDuration,
+  })
   return result
 }
 

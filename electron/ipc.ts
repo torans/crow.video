@@ -232,6 +232,7 @@ export default function initIPC() {
 
   // 智能匹配选片
   ipcMain.handle('vl-match-video-segments', (_event, params) => {
+    console.log('[vl-match-video-segments IPC] 被调用了！params=', JSON.stringify(params, null, 2))
     return matchVideoSegments(params)
   })
 

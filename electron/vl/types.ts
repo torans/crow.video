@@ -44,11 +44,13 @@ export interface AnalyzeVideoAssetsResult {
 export interface MatchVideoSegmentsParams {
   productColors: string[]
   productTags: string[]
+  productSceneTags?: string[] // 场景标签，用于场景模式匹配
   targetDuration: number
   videoPaths?: string[] // 可选，指定素材库范围，不传则用全量帧
   text?: string // 文案文本，用于语义对齐选片
   minSegmentDuration?: number // default 2
   maxSegmentDuration?: number // default 15
+  matchMode?: 'auto' | 'product' | 'scene' // default 'auto'
 }
 
 export interface MatchedSegment {
@@ -73,6 +75,7 @@ export interface ProductReferenceRecord {
   description: string
   colors: string
   tags: string
+  scene_tags: string
   created_at: number
 }
 

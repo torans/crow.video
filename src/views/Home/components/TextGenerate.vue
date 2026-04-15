@@ -12,6 +12,19 @@
 
           <div class="text-panel__toolbar">
             <v-select
+              v-model="appStore.renderConfig.matchMode"
+              :items="[
+                { label: '产品模式', value: 'product' },
+                { label: '场景模式', value: 'scene' },
+              ]"
+              item-title="label"
+              item-value="value"
+              density="compact"
+              hide-details
+              variant="outlined"
+              style="min-width: 76px;"
+            />
+            <v-select
               v-model="appStore.llmConfig.language"
               :items="languageOptions"
               item-title="label"
@@ -189,6 +202,8 @@ const buildSystemPrompt = (productContext?: string): string => {
   if (productContext) return productContext
   const lang = appStore.llmConfig.language || '中文'
   const product = appStore.currentProduct
+  const isSceneMode = appStore.renderConfig.matchMode === 'scene'
+
   if (product) {
     const parts: string[] = []
     parts.push(`你是一个专业的短视频口播文案撰写人。请严格遵守以下规则：`)
@@ -204,6 +219,16 @@ const buildSystemPrompt = (productContext?: string): string => {
     if (product.highlights) parts.push(`产品亮点：${product.highlights}`)
     if (product.target_audience) parts.push(`目标受众：${product.target_audience}`)
     if (product.description) parts.push(`产品外观：${product.description}`)
+
+    if (isSceneMode) {
+      // 场景模式：侧重使用体验、真实感受
+      parts.push('')
+      parts.push('【文案风格要求】')
+      parts.push('重点描述真实使用场景和使用感受，突出"用了之后怎么样"的体验感。')
+      parts.push('要有代入感，让观众觉得"这就是我平时的使用场景"。')
+      parts.push('可以结合生活中的具体情境，如：运动健身、出门在外、工作通勤、居家日常等。')
+    }
+
     return parts.join('\n')
   }
   return `你是一个专业的短视频口播文案撰写人。请严格遵守以下规则：\n1. 只输出口播文案正文，不要输出标题、标签、分段、markdown格式\n2. 文案必须是口语化的，像真人说话一样自然流畅\n3. 字数严格控制在80-150字，适合15-30秒的短视频\n4. 要有吸引力，开头抓人眼球\n5. 必须使用${lang}输出文案`

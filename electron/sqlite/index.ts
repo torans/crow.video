@@ -157,6 +157,7 @@ export const initSqlite = async () => {
         description TEXT NOT NULL DEFAULT '',
         colors TEXT NOT NULL DEFAULT '[]',
         tags TEXT NOT NULL DEFAULT '[]',
+        scene_tags TEXT NOT NULL DEFAULT '[]',
         created_at INTEGER NOT NULL DEFAULT 0
       )
     `)
@@ -184,6 +185,13 @@ export const initSqlite = async () => {
     // 兼容旧数据：如果 appeal 列不存在则添加
     try {
       db.exec(`ALTER TABLE video_frame_analysis ADD COLUMN appeal REAL NOT NULL DEFAULT 5`)
+    } catch {
+      // 列已存在，忽略
+    }
+
+    // 兼容旧数据：如果 scene_tags 列不存在则添加
+    try {
+      db.exec(`ALTER TABLE product_reference ADD COLUMN scene_tags TEXT NOT NULL DEFAULT '[]'`)
     } catch {
       // 列已存在，忽略
     }

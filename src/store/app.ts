@@ -59,6 +59,7 @@ export const useAppStore = defineStore(
       outputPath: '',
       outputFileName: 'crow-video',
       outputFileExt: '.mp4',
+      matchMode: 'product' as 'auto' | 'product' | 'scene',
     })
     const autoBatch = ref(false)
     const renderStatus = ref(RenderStatus.None)
@@ -126,7 +127,7 @@ export const useAppStore = defineStore(
   },
   {
     persist: {
-      omit: ['autoBatch', 'renderStatus', 'analysisStatus', 'analysisProgress', 'currentProduct'],
+      omit: ['autoBatch', 'renderStatus', 'analysisStatus', 'analysisProgress', 'currentProduct', 'videoAssets'],
     },
   },
 )
