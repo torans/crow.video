@@ -72,6 +72,9 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
+      - name: Check out Git repository
+        uses: actions/checkout@v4
+
       - name: Download Mac artifact
         uses: actions/download-artifact@v4
         with:
