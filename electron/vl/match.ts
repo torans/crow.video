@@ -504,7 +504,6 @@ export async function matchVideoSegments(
           semantic: f.semantic,
           combined: f.combined,
           appeal: f.appeal,
-          finalScore: f.finalScore,
           description: f.description,
         }))
       })

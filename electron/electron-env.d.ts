@@ -78,6 +78,7 @@ interface Window {
       description?: string
       colors?: string[]
       tags?: string[]
+      sceneTags?: string[]
     }) => Promise<string>
     vlUpdateProductReference: (params: {
       id: string
@@ -86,6 +87,7 @@ interface Window {
       features: string
       highlights: string
       targetAudience: string
+      sceneTags?: string[]
     }) => Promise<void>
     vlUpdateProductAnalysis: (params: {
       id: string

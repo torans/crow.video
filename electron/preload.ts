@@ -76,9 +76,9 @@ contextBridge.exposeInMainWorld('electron', {
   // 产品参考管理
   vlAnalyzeProductReference: (params: { imagePaths: string[]; apiConfig: VLApiConfig }) =>
     ipcRenderer.invoke('vl-analyze-product-reference', params),
-  vlSaveProductReference: (params: { name: string; imagePaths: string[]; features: string; highlights: string; targetAudience: string; description?: string; colors?: string[]; tags?: string[] }) =>
+  vlSaveProductReference: (params: { name: string; imagePaths: string[]; features: string; highlights: string; targetAudience: string; description?: string; colors?: string[]; tags?: string[]; sceneTags?: string[] }) =>
     ipcRenderer.invoke('vl-save-product-reference', params),
-  vlUpdateProductReference: (params: { id: string; name: string; imagePaths: string[]; features: string; highlights: string; targetAudience: string }) =>
+  vlUpdateProductReference: (params: { id: string; name: string; imagePaths: string[]; features: string; highlights: string; targetAudience: string; sceneTags?: string[] }) =>
     ipcRenderer.invoke('vl-update-product-reference', params),
   vlUpdateProductAnalysis: (params: { id: string; analysis: { description: string; colors: string[]; tags: string[] } }) =>
     ipcRenderer.invoke('vl-update-product-analysis', params),

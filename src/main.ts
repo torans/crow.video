@@ -5,7 +5,7 @@ import * as components from 'vuetify/components'
 import * as directives from 'vuetify/directives'
 import { aliases, mdi } from 'vuetify/iconsets/mdi'
 
-import Toast, { PluginOptions } from 'vue-toastification'
+import Toast from 'vue-toastification'
 import 'vue-toastification/dist/index.css'
 
 import 'virtual:uno.css'
@@ -99,11 +99,12 @@ const vuetify = createVuetify({
 const app = createApp(App)
 
 app.use(vuetify)
-app.use(Toast, {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+app.use(Toast as any, {
   position: 'bottom-left',
   pauseOnFocusLoss: false,
   closeOnClick: false,
-} as PluginOptions)
+})
 app.use(router)
 app.use(store)
 
