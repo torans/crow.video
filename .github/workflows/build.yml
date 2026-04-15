@@ -6,11 +6,27 @@ on:
       - 'v*'
 
 jobs:
-  build-macos:
-    runs-on: macos-latest
+  build:
+    runs-on: ${{ matrix.platform.runner }}
+    permissions:
+      contents: write
+    strategy:
+      fail-fast: false
+      matrix:
+        platform:
+          - name: macOS
+            runner: macos-latest
+            artifact_name: crow-video-macos
+            artifact_paths: |
+              ./*.dmg
+          - name: Windows
+            runner: windows-latest
+            artifact_name: crow-video-windows
+            artifact_paths: |
+              ./*-setup.exe
 
     steps:
-      - name: Check out Git repository
+      - name: Checkout
         uses: actions/checkout@v4
 
       - name: Install Node.js
@@ -24,6 +40,7 @@ jobs:
           pnpm install
 
       - name: Build MacOS
+        if: matrix.platform.name == 'macOS'
         run: |
           export ELECTRON_BUILDER_EXTRA_ARGS="--universal"
           pnpm run lipo-ffmpeg
@@ -31,69 +48,36 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           CSC_IDENTITY_AUTO_DISCOVERY: false
-          DEBUG: electron-builder
-
-      - name: Upload Mac artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macos-build
-          path: release/**/*.dmg
-
-  build-windows:
-    runs-on: windows-latest
-
-    steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v4
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: '22.17.0'
-
-      - name: Install Dependencies
-        run: |
-          npm install -g pnpm@10.12.4
-          pnpm install
 
       - name: Build Windows
+        if: matrix.platform.name == 'Windows'
         run: pnpm run build
         env:
           GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      - name: Upload Windows artifact
+      - name: Upload artifact
         uses: actions/upload-artifact@v4
         with:
-          name: windows-build
-          path: release/**/*.exe
+          name: ${{ matrix.platform.artifact_name }}-${{ github.sha }}
+          if-no-files-found: error
+          path: ${{ matrix.platform.artifact_paths }}
 
   release:
-    needs: [build-macos, build-windows]
+    needs: build
     runs-on: ubuntu-latest
     permissions:
       contents: write
     steps:
-      - name: Check out Git repository
-        uses: actions/checkout@v4
-
-      - name: Download Mac artifact
+      - name: Download artifacts
         uses: actions/download-artifact@v4
         with:
-          name: macos-build
           path: .
+          pattern: crow-video-*
+          merge-multiple: true
 
-      - name: Download Windows artifact
-        uses: actions/download-artifact@v4
-        with:
-          name: windows-build
-          path: .
-
-      - name: List files
-        run: find . -name "*.dmg" -o -name "*.exe"
-
-      - name: Upload artifacts to release
+      - name: Upload to Release
         uses: softprops/action-gh-release@v2
         with:
           files: |
-            ./*.dmg
-            ./*-setup.exe
+            *.dmg
+            *-setup.exe
