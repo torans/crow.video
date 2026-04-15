@@ -70,7 +70,8 @@ jobs:
   release:
     needs: [build-macos, build-windows]
     runs-on: ubuntu-latest
-
+    permissions:
+      contents: write
     steps:
       - name: Check out Git repository
         uses: actions/checkout@v4
@@ -79,31 +80,20 @@ jobs:
         uses: actions/download-artifact@v4
         with:
           name: macos-build
-          path: release
+          path: .
 
       - name: Download Windows artifact
         uses: actions/download-artifact@v4
         with:
           name: windows-build
-          path: release
+          path: .
 
-      - name: Get version from tag
-        id: get_version
-        run: echo "VERSION=${GITHUB_REF#refs/tags/v}" >> $GITHUB_ENV
+      - name: List files
+        run:          find . -name "*.dmg" -o -name "*.exe" | head -20
 
-      - name: Read release notes
-        run: |
-          NOTES=$(awk "/## \[v${{ env.VERSION }}\]/{p=1;print;next} /## \[v/{p=0}p" CHANGELOG.md)
-          echo "NOTES<<EOF" >> $GITHUB_ENV
-          echo "$NOTES" >> $GITHUB_ENV
-          echo "EOF" >> $GITHUB_ENV
-
-      - name: Publish Release
+      - name: Upload artifacts to release
         uses: softprops/action-gh-release@v2
         with:
-          files: release/**/*.dmg release/**/*.exe
-          body: ${{ env.NOTES }}
-          draft: false
-          prerelease: false
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          files: |
+            *.dmg
+            *.exe
