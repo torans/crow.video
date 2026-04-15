@@ -18,12 +18,12 @@ jobs:
             runner: macos-latest
             artifact_name: crow-video-macos
             artifact_paths: |
-              ./*.dmg
+              release/*.dmg
           - name: Windows
             runner: windows-latest
             artifact_name: crow-video-windows
             artifact_paths: |
-              ./*-setup.exe
+              release/*-setup.exe
 
     steps:
       - name: Checkout
