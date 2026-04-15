@@ -1,178 +1,142 @@
-<a id="readme-top"></a>
+# 乌鸦视频工厂 (crow.video)
 
-<!-- 项目海报 -->
-<div align="center">
-  <img src="images/ScreenShot.png" alt="Poster" width="100%">
-</div>
+> 抖店 / 快手 / TikTok 卖家专属，AI 全自动批量生成竖屏带货视频（日产 1000+ 条）
 
----
-
-<br />
-<div align="center">
-  <a href="https://github.com/YILS-LIN/short-video-factory">
-    <img src="public/icon.png" alt="Logo" height="100">
-  </a>
-
-  <h3 align="center">AI Short Video Factory - 短视频工厂</h3>
-
-  <p align="center">
-    一键生成产品营销短视频 · AI批量自动剪辑 · 高颜值跨平台桌面端工具
-  </p>
-
-  [![贡献者][contributors-shield]][contributors-url]
-  [![星标][stars-shield]][stars-url]
-  [![问题][issues-shield]][issues-url]
-  [![最新版本][release-shield]][release-url]
-  [![许可证][license-shield]][license-url]
-
-  <p align="center">
-    <a href="https://github.com/YILS-LIN/short-video-factory/issues/new?labels=bug&template=bug-report---.md">报告Bug</a>
-    &middot;
-    <a href="https://github.com/YILS-LIN/short-video-factory/issues/new?labels=enhancement&template=feature-request---.md">请求功能</a>
-  </p>
-</div>
+官网: https://crow.video
 
 ---
 
-## 📖 关于项目
+## 产品功能
 
-短视频工厂是一个开源桌面端应用，通过 AI 技术简化短视频制作流程。用户只需提供产品信息和文案，即可自动剪辑出高质量的产品营销视频。
-
-### 核心功能
-
-| 功能 | 说明 |
+| 模块 | 说明 |
 |------|------|
-| 🤖 AI 文案生成 | 基于产品信息自动生成营销文案 |
-| 🎙️ 语音合成 | 将文案转换为自然语音（EdgeTTS） |
-| 🎥 智能选片 | 根据产品视觉特征自动匹配素材片段 |
-| 🎬 视频合成 | FFmpeg 驱动，自动剪辑配音+素材+字幕 |
-| 📦 批量处理 | 支持任务队列，自动持续合成多个视频 |
-| 🌐 多语言 | 支持中文、英文等多种语言 |
-| 🔒 本地运行 | 数据完全本地处理，保障隐私安全 |
-
-### 适用场景
-
-- 🛒 **电商产品展示** — 淘宝、抖音、亚马逊等产品视频
-- 📱 **社交媒体内容** — 微信视频号、小红书短视频
-- 📺 **品牌营销物料** — 企业宣传、活动推广视频
-
-<p align="right">(<a href="#readme-top">返回顶部</a>)</p>
+| **产品灵感台** | 录入商品名称、功能、亮点、受众，AI 自动分析颜色与标签 |
+| **AI 口播文案** | DeepSeek 生成 80-150 字口播脚本，适合 15-30 秒短视频 |
+| **语音合成** | 阿里云 Qwen TTS，多音色可选，一键合成自然语音 |
+| **视频剪辑** | 两种模式：随机选片 或 VL 智能匹配（颜色/标签/文案语义对齐） |
+| **混音导出** | 可选随机 BGM，输出 9:16 竖屏 MP4（默认 1080×1920） |
+| **批量自动化** | 开启后自动连续生成多个视频，一键日产 1000+ 条 |
 
 ---
 
-## 🚀 开始使用
+## 技术栈
 
-1. 前往 [Github Release](https://github.com/YILS-LIN/short-video-factory/releases) 下载最新版本
-2. 解压并运行应用
-3. 配置 AI API（支持 OpenAI 兼容接口）
-4. 添加产品信息和视频素材，开始创作
-
-📖 详细使用手册：[官方文档](https://short-video-factory.yils.blog)
-
-<p align="right">(<a href="#readme-top">返回顶部</a>)</p>
-
----
-
-## 🗺️ 路线图
-
-**喜欢可以点个 Star 支持一下哦！**
-
-### 已完成
-
-- [x] AI 文案生成（兼容 OpenAI 接口格式）
-- [x] 语音合成（EdgeTTS）
-- [x] 视频剪辑（FFmpeg 自动混剪）
-- [x] 智能选片（基于产品视觉特征匹配）
-- [x] 批量处理任务
-- [x] 多语言支持
-- [x] 完整使用手册
-
-### 计划中
-
-- [ ] 故事线模板（自定义视频叙事结构）
-- [ ] 更多语音合成 API 支持
-- [ ] 字幕样式和特效
-- [ ] 更丰富的参数调整选项
-
-查看 [开放问题](https://github.com/YILS-LIN/short-video-factory/issues) 获取完整功能列表。
-
-<p align="right">(<a href="#readme-top">返回顶部</a>)</p>
+| 层级 | 技术 |
+|------|------|
+| 框架 | Vue 3 + TypeScript + Vite |
+| 桌面端 | Electron |
+| UI 组件 | Vuetify 3 |
+| 状态管理 | Pinia |
+| 视频渲染 | FFmpeg (ffmpeg-static) |
+| AI 文案 | DeepSeek Chat (AI SDK) |
+| 语音合成 | 阿里云 Qwen TTS |
+| 视觉匹配 | 阿里云 Qwen VL Plus |
+| 数据库 | better-sqlite3 |
+| 国际化 | i18next |
 
 ---
 
-## 🎞️ 示例视频
+## 项目结构
 
-> 素材来源于网络，仅用于展示剪辑效果
-
-| 产品营销 | 泛内容语录 |
-|:--------:|:---------:|
-| ▶️ [点击观看](https://github.com/user-attachments/assets/165a8f96-861b-4cf3-946c-444b9692cef8) | ▶️ [点击观看](https://github.com/user-attachments/assets/12694618-e0fe-4848-8a7e-98b3f3a7aece) |
-
-<p align="right">(<a href="#readme-top">返回顶部</a>)</p>
-
----
-
-## 🤝 贡献
-
-贡献让开源社区成为学习、启发和创造的绝佳场所。**非常感谢**任何贡献。
-
-1. Fork 此项目
-2. 创建功能分支 (`git checkout -b feature/AmazingFeature`)
-3. 提交更改 (`git commit -m 'Add some AmazingFeature'`)
-4. 推送分支 (`git push origin feature/AmazingFeature`)
-5. 创建 Pull Request
-
-### 主要贡献者
-
-<a href="https://github.com/YILS-LIN/short-video-factory/graphs/contributors">
-  <img src="https://contrib.rocks/image?repo=YILS-LIN/short-video-factory" alt="contrib.rocks image" />
-</a>
-
-<p align="right">(<a href="#readme-top">返回顶部</a>)</p>
-
----
-
-## 💖 鸣谢
-
-- [rany2/edge-tts](https://github.com/rany2/edge-tts) — Edge TTS 语音合成
-- [duyquangnvx/edge-tts](https://github.com/duyquangnvx/edge-tts) — TTS 相关
-
-<p align="right">(<a href="#readme-top">返回顶部</a>)</p>
-
----
-
-## 🎗️ 许可证
-
-[![许可证][license-shield]][license-url]
-
-Copyright © 2025-present YILS. 基于 MIT 许可证开源。
-
-<p align="right">(<a href="#readme-top">返回顶部</a>)</p>
+```
+short-video-factory/
+├── electron/                  # Electron 主进程
+│   ├── main.ts               # 主进程入口，窗口管理
+│   ├── preload.ts            # 预加载脚本，暴露 IPC
+│   ├── ipc.ts                # IPC 处理器注册
+│   ├── ffmpeg/               # FFmpeg 相关逻辑
+│   ├── tts/                  # Qwen TTS 语音合成
+│   │   └── index.ts
+│   ├── vl/                   # Qwen VL 视觉匹配
+│   │   ├── analyze-product.ts   # 分析商品颜色/标签
+│   │   ├── analyze-video.ts     # 分析视频片段
+│   │   └── match.ts             # 智能匹配算法
+│   ├── sqlite/               # SQLite 数据库
+│   └── lib/                  # 工具函数
+├── src/                      # Vue 渲染进程
+│   ├── App.vue              # 根组件
+│   ├── main.ts              # 渲染进程入口
+│   ├── router/              # Vue Router
+│   ├── store/               # Pinia 状态管理
+│   │   └── app.ts          # 全局状态（LLM/TTS/VL 配置、渲染状态等）
+│   ├── views/Home/         # 首页工作台
+│   │   ├── index.vue       # 三栏布局：创意 → 素材 → 执行
+│   │   └── components/
+│   │       ├── ProductReference.vue   # 产品灵感台
+│   │       ├── TextGenerate.vue        # AI 文案生成
+│   │       ├── TtsControl.vue          # 语音合成控制
+│   │       ├── VideoManage.vue         # 视频素材管理
+│   │       └── VideoRender.vue          # 视频渲染控制
+│   └── components/         # 公共组件
+├── locales/                 # 国际化文案 (i18next)
+├── dist-electron/           # Electron 构建输出
+├── dist/                    # Vite 构建输出
+└── package.json
+```
 
 ---
 
-## ⭐ 星标历史
+## 渲染流程
 
-<div align="center">
-  <a href="https://star-history.com/#YILS-LIN/short-video-factory">
-    <img src="https://api.star-history.com/svg?repos=YILS-LIN/short-video-factory&type=Date" alt="Star History Chart" width="800">
-  </a>
-</div>
+```
+用户点击"开始渲染"
+       │
+       ▼
+① GenerateText     AI 生成口播文案（DeepSeek）
+       │
+       ▼
+② SynthesizedSpeech  语音合成（Qwen TTS），获取音频时长
+       │
+       ▼
+③ SegmentVideo    智能匹配或随机选取视频片段
+                   ┌─ 智能匹配：颜色 + 标签 + 文案语义三重对齐
+                   └─ 回退：随机选片
+       │
+       ▼
+④ Rendering       FFmpeg 合成视频（混音 + 字幕 + 竖屏裁剪）
+       │
+       ▼
+⑤ Completed       导出 MP4，自动批量下一条
+```
 
-<p align="right">(<a href="#readme-top">返回顶部</a>)</p>
+---
 
-<!-- 链接 -->
+## 开发
 
-[contributors-shield]: https://img.shields.io/github/contributors/YILS-LIN/short-video-factory.svg?color=c4f042&labelColor=black&style=flat-square
-[contributors-url]: https://github.com/YILS-LIN/short-video-factory/graphs/contributors
-[forks-shield]: https://img.shields.io/github/forks/YILS-LIN/short-video-factory.svg?color=8ae8ff&labelColor=black&style=flat-square
-[forks-url]: https://github.com/YILS-LIN/short-video-factory/network/members
-[stars-shield]: https://img.shields.io/github/stars/YILS-LIN/short-video-factory.svg?color=ffcb47&labelColor=black&style=flat-square
-[stars-url]: https://github.com/YILS-LIN/short-video-factory/stargazers
-[issues-shield]: https://img.shields.io/github/issues/YILS-LIN/short-video-factory.svg?labelColor=black&style=flat-square
-[issues-url]: https://github.com/YILS-LIN/short-video-factory/issues
-[release-shield]: https://img.shields.io/github/v/release/YILS-LIN/short-video-factory?labelColor=black&style=flat-square
-[release-url]: https://github.com/YILS-LIN/short-video-factory/releases
-[release-date-shield]: https://img.shields.io/github/release-date/YILS-LIN/short-video-factory?color=9cf&style=flat-round
-[license-shield]: https://img.shields.io/github/license/YILS-LIN/short-video-factory.svg?labelColor=black&style=flat-square
-[license-url]: https://github.com/YILS-LIN/short-video-factory/blob/main/LICENSE
+```bash
+# 安装依赖（仅限 pnpm）
+pnpm install
+
+# 依赖后处理（构建 native 模块）
+pnpm postinstall
+
+# 本地开发
+pnpm dev
+
+# 构建桌面应用
+pnpm build
+
+# 代码格式化
+pnpm format
+```
+
+---
+
+## 配置说明
+
+首次使用需在应用内配置：
+
+| 配置项 | 说明 |
+|--------|------|
+| **DeepSeek API** | AI 文案生成的模型和密钥 |
+| **阿里云 API Key** | 同时用于 Qwen TTS 和 Qwen VL |
+
+输出路径、分辨率、BGM 素材路径等可在渲染配置中自行设置。
+
+---
+
+## 相关链接
+
+- 官网: https://crow.video
+- 导航站: https://seekaitools.com
+- 博客: https://lanqiu.tech
