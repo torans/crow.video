@@ -9,7 +9,7 @@ import {
   SelectFolderParams,
   StatEventParams,
 } from './types'
-import { ttsSynthesizeToUrl, ttsSynthesizeToFile } from './tts'
+import { edgeTtsGetVoiceList, edgeTtsSynthesizeToBase64, edgeTtsSynthesizeToFile } from './tts'
 import { renderVideo } from './ffmpeg'
 import { sendStatEvent } from './lib/stat'
 import { testVLConnection } from './vl'
@@ -167,9 +167,18 @@ export default function initIPC() {
       }))
   })
 
-  // 语音合成（Qwen TTS）
-  ipcMain.handle('tts-synthesize-to-url', (_event, params) => ttsSynthesizeToUrl(params))
-  ipcMain.handle('tts-synthesize-to-file', (_event, params) => ttsSynthesizeToFile(params))
+  // 获取 EdgeTTS 语音列表
+  ipcMain.handle('edge-tts-get-voice-list', () => edgeTtsGetVoiceList())
+
+  // 语音合成返回 Base64（用于试听）
+  ipcMain.handle('edge-tts-synthesize-to-base64', (_event, params) =>
+    edgeTtsSynthesizeToBase64(params),
+  )
+
+  // 保存语音合成到文件（Edge TTS，支持字幕）
+  ipcMain.handle('edge-tts-synthesize-to-file', (_event, params) =>
+    edgeTtsSynthesizeToFile(params),
+  )
 
   // 统计事件上报
   ipcMain.handle('stat-track', (_event, params: StatEventParams) => sendStatEvent(params))

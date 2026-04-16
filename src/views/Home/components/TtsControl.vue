@@ -14,29 +14,40 @@
             </template>
             <v-card prepend-icon="mdi-microphone-settings" :title="t('common.buttons.config')">
               <v-card-text>
-                <v-text-field
-                  :label="t('features.tts.config.apiKey')"
-                  v-model="tempConfig.apiKey"
-                  type="password"
-                  required
-                  clearable
-                  hint="阿里云百炼 DashScope API Key"
-                  persistent-hint
-                ></v-text-field>
-                <v-text-field
-                  :label="t('features.tts.config.apiUrl')"
-                  v-model="tempConfig.apiUrl"
-                  required
-                  clearable
-                ></v-text-field>
-                <v-text-field
-                  :label="t('features.tts.config.model')"
-                  v-model="tempConfig.model"
-                  required
-                  clearable
-                  hint="默认 qwen3-tts-flash"
-                  persistent-hint
-                ></v-text-field>
+                <v-combobox
+                  v-model="appStore.language"
+                  density="compact"
+                  :label="t('features.tts.config.language')"
+                  :items="languageItems"
+                  :no-data-text="t('common.states.noData')"
+                  @update:model-value="clearVoice"
+                ></v-combobox>
+                <v-select
+                  v-model="appStore.gender"
+                  density="compact"
+                  :label="t('features.tts.config.gender')"
+                  :items="genderItems"
+                  item-title="label"
+                  item-value="value"
+                  @update:model-value="clearVoice"
+                ></v-select>
+                <v-select
+                  v-model="appStore.voice"
+                  density="compact"
+                  :label="t('features.tts.config.voice')"
+                  :items="filteredVoicesList"
+                  item-title="FriendlyName"
+                  return-object
+                  :no-data-text="t('features.tts.config.selectLanguageGenderFirst')"
+                ></v-select>
+                <v-select
+                  v-model="appStore.speed"
+                  density="compact"
+                  :label="t('features.tts.config.speed')"
+                  :items="speedItems"
+                  item-title="label"
+                  item-value="value"
+                ></v-select>
               </v-card-text>
               <v-divider></v-divider>
               <v-card-actions>
@@ -44,13 +55,7 @@
                 <v-btn
                   :text="t('common.buttons.close')"
                   variant="plain"
-                  @click="handleCloseDialog"
-                ></v-btn>
-                <v-btn
-                  color="primary"
-                  :text="t('common.buttons.save')"
-                  variant="tonal"
-                  @click="handleSaveConfig"
+                  @click="configDialogShow = false"
                 ></v-btn>
               </v-card-actions>
             </v-card>
@@ -60,20 +65,13 @@
         <div class="tts-panel__body">
           <div class="tts-panel__grid">
             <v-select
-              v-model="appStore.ttsConfig.voice"
+              v-model="appStore.voice"
               :label="t('features.tts.config.voice')"
-              :items="voiceItems"
-              item-title="label"
-              item-value="name"
+              :items="filteredVoicesList"
+              item-title="FriendlyName"
+              return-object
               density="compact"
-            ></v-select>
-            <v-select
-              v-model="appStore.ttsConfig.languageType"
-              :label="t('features.tts.config.language')"
-              :items="languageItems"
-              item-title="label"
-              item-value="value"
-              density="compact"
+              :no-data-text="t('features.tts.config.selectLanguageGenderFirst')"
             ></v-select>
           </div>
 
@@ -102,13 +100,12 @@
 </template>
 
 <script lang="ts" setup>
-import { ref, computed, onUnmounted, h, toRaw, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, h } from 'vue'
 import { useAppStore } from '@/store'
 import { useToast } from 'vue-toastification'
 import { useTranslation } from 'i18next-vue'
 import ActionToastEmbed from '@/components/ActionToastEmbed.vue'
 import { formatErrorForCopy } from '@/lib/error-copy'
-import { QWEN_TTS_VOICES, QWEN_TTS_LANGUAGES } from '~/electron/tts/types'
 
 const toast = useToast()
 const appStore = useAppStore()
@@ -130,15 +127,8 @@ defineProps<{
   disabled?: boolean
 }>()
 
-const voiceItems = computed(() => QWEN_TTS_VOICES)
-const languageItems = computed(() => QWEN_TTS_LANGUAGES)
-
 const configValid = () => {
-  if (!appStore.ttsConfig.apiKey) {
-    toast.warning(t('features.tts.errors.apiKeyRequired'))
-    return false
-  }
-  if (!appStore.ttsConfig.voice) {
+  if (!appStore.voice) {
     toast.warning(t('features.tts.config.selectVoiceWarning'))
     return false
   }
@@ -149,7 +139,6 @@ const configValid = () => {
   return true
 }
 
-// 试听
 const tryListeningLoading = ref(false)
 let currentAudio: HTMLAudioElement | null = null
 const handleTryListening = async () => {
@@ -163,11 +152,14 @@ const handleTryListening = async () => {
 
   tryListeningLoading.value = true
   try {
-    const audioUrl = await window.electron.ttsSynthesizeToUrl({
+    const speech = await window.electron.edgeTtsSynthesizeToBase64({
       text: appStore.tryListeningText,
-      config: structuredClone(toRaw(appStore.ttsConfig)),
+      voice: appStore.voice!.ShortName,
+      options: {
+        rate: appStore.speed,
+      },
     })
-    currentAudio = new Audio(audioUrl)
+    currentAudio = new Audio(`data:audio/mp3;base64,${speech}`)
     currentAudio.play()
     toast.info(t('features.tts.info.playTryAudio'))
   } catch (error: any) {
@@ -197,6 +189,74 @@ const handleTryListening = async () => {
   }
 }
 
+const clearVoice = () => {
+  appStore.voice = null
+}
+
+const filteredVoicesList = computed(() => {
+  if (!appStore.language || !appStore.gender) return []
+  return appStore.originalVoicesList.filter(
+    (v: any) =>
+      v.FriendlyName.includes(appStore.language!) && v.Gender === appStore.gender,
+  )
+})
+
+const genderItems = computed(() => [
+  { label: t('features.tts.config.genderFemale'), value: 'Female' },
+  { label: t('features.tts.config.genderMale'), value: 'Male' },
+])
+
+const languageItems = computed(() => {
+  const locales = new Set<string>()
+  for (const v of appStore.originalVoicesList) {
+    const lang = v.Locale.replace(/-[A-Z]{2}$/, '')
+    locales.add(lang)
+  }
+  return [...locales].sort()
+})
+
+const speedItems = computed(() => [
+  { label: t('features.tts.config.speedSlow'), value: -30 },
+  { label: t('features.tts.config.speedMedium'), value: 0 },
+  { label: t('features.tts.config.speedFast'), value: 30 },
+])
+
+const fetchVoices = async () => {
+  try {
+    appStore.originalVoicesList = await window.electron.edgeTtsGetVoiceList()
+    console.log('EdgeTTS语音列表获取成功:', appStore.originalVoicesList.length, '个')
+  } catch (error: any) {
+    console.log('获取EdgeTTS语音列表失败', error)
+    const errorMessage = error?.error?.message || error?.message || error
+    toast.error({
+      component: {
+        render: () =>
+          h(ActionToastEmbed, {
+            message: t('features.tts.errors.fetchVoicesFailed'),
+            detail: String(errorMessage),
+            actionText: t('common.buttons.copyErrorDetail'),
+            onActionTirgger: () => {
+              navigator.clipboard.writeText(
+                formatErrorForCopy(
+                  t('features.tts.errors.fetchVoicesFailed'),
+                  String(errorMessage),
+                ),
+              )
+              toast.success(t('common.messages.success.copySuccess'))
+            },
+          }),
+      },
+    })
+  }
+}
+
+onMounted(async () => {
+  await fetchVoices()
+  if (appStore.voice && !appStore.originalVoicesList.find((v: any) => v.Name === appStore.voice?.Name)) {
+    appStore.voice = null
+  }
+})
+
 onUnmounted(() => {
   if (currentAudio) {
     currentAudio.pause()
@@ -207,31 +267,19 @@ onUnmounted(() => {
 
 // 配置弹窗
 const configDialogShow = ref(false)
-const tempConfig = ref(structuredClone(toRaw(appStore.ttsConfig)))
-const handleCloseDialog = () => {
-  configDialogShow.value = false
-  nextTick(() => {
-    tempConfig.value = structuredClone(toRaw(appStore.ttsConfig))
-  })
-}
-const handleSaveConfig = () => {
-  appStore.updateTtsConfig(tempConfig.value)
-  configDialogShow.value = false
-}
 
 // 合成到文件（暴露给外部组件调用）
-const synthesizedSpeechToFile = async (option: { text: string }) => {
-  if (!appStore.ttsConfig.apiKey) {
-    throw new Error(t('features.tts.errors.apiKeyRequired') as string)
-  }
-  if (!appStore.ttsConfig.voice) {
-    throw new Error(t('features.tts.config.selectVoiceWarning') as string)
-  }
+const synthesizedSpeechToFile = async (option: { text: string; withCaption?: boolean }) => {
+  if (!configValid()) throw new Error(t('features.tts.errors.configInvalid') as string)
 
   try {
-    const result = await window.electron.ttsSynthesizeToFile({
+    const result = await window.electron.edgeTtsSynthesizeToFile({
       text: option.text,
-      config: structuredClone(toRaw(appStore.ttsConfig)),
+      voice: appStore.voice!.ShortName,
+      options: {
+        rate: appStore.speed,
+      },
+      withCaption: option?.withCaption,
     })
     return result
   } catch (error) {

@@ -220,13 +220,28 @@ const buildSystemPrompt = (productContext?: string): string => {
     if (product.target_audience) parts.push(`目标受众：${product.target_audience}`)
     if (product.description) parts.push(`产品外观：${product.description}`)
 
+    // 场景模式：侧重使用体验、真实感受
     if (isSceneMode) {
-      // 场景模式：侧重使用体验、真实感受
       parts.push('')
-      parts.push('【文案风格要求】')
-      parts.push('重点描述真实使用场景和使用感受，突出"用了之后怎么样"的体验感。')
-      parts.push('要有代入感，让观众觉得"这就是我平时的使用场景"。')
-      parts.push('可以结合生活中的具体情境，如：运动健身、出门在外、工作通勤、居家日常等。')
+      parts.push('【文案风格要求——场景模式】')
+      parts.push('参考以下优秀竞品文案风格：')
+      parts.push('1. 开头用一句话戳中用户痛点或误区，让用户觉得"说的就是我"')
+      parts.push('2. 自然引入产品，不生硬，用"来试试这款"、"用它"等口语化过渡')
+      parts.push('3. 描述产品卖点时要多用具体可感的词：如"不吸水、不长汗、一抛清杯、不易下线"')
+      parts.push('4. 结尾加入使用场景代入，让用户想象自己用上的画面，如"让你成为人群中最靓的仔"')
+      parts.push('5. 最后用简短行动号召收尾，如"赶紧带回家"、"点击下方链接"等')
+      parts.push('整体风格：像朋友推荐、不是打广告；口语化、有温度、有画面感')
+    } else {
+      // 产品模式
+      parts.push('')
+      parts.push('【文案风格要求——产品模式】')
+      parts.push('参考以下优秀竞品文案风格：')
+      parts.push('1. 开头用一句话戳中用户痛点或误区，让用户觉得"说的就是我"')
+      parts.push('2. 自然引入产品，不生硬，用"来试试这款"、"用它"等口语化过渡')
+      parts.push('3. 描述产品卖点时要多用具体可感的词：颜色、手感、功能效果等')
+      parts.push('4. 结尾加入使用场景代入，让用户想象自己用上的画面')
+      parts.push('5. 最后用简短行动号召收尾')
+      parts.push('整体风格：像朋友推荐、不是打广告；口语化、有温度、有画面感')
     }
 
     return parts.join('\n')

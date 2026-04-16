@@ -138,6 +138,16 @@ export interface SynthesisResult {
    * Get Caption Srt String
    */
   getCaptionSrtString(): string
+
+  /**
+   * Get Caption ASS String with custom font size and position
+   */
+  getCaptionAssString(
+    fontSize?: number,
+    marginFromBottom?: number,
+    playResY?: number,
+    playResX?: number,
+  ): string
 }
 
 const INCOMPATIBLE_CODE_RANGES = [
@@ -358,6 +368,102 @@ class SynthesisResultImpl implements SynthesisResult {
     return this.audioBuffer.length
   }
 
+  /**
+   * 生成 ASS 字幕字符串，支持自定义字体大小和位置
+   * @param fontSize 字体大小，默认 56
+   * @param marginFromBottom 距离底部像素数，默认 300
+   * @param playResY 视频高度，用于坐标换算，默认 1920（竖版视频）
+   * @param playResX 视频宽度，默认 1080
+   */
+  getCaptionAssString(
+    fontSize: number = 56,
+    marginFromBottom: number = 300,
+    playResY: number = 1920,
+    playResX: number = 1080,
+  ): string {
+    let currentSentence: WordBoundary[] = []
+
+    const isNoSpaceScript = (char: string): boolean => {
+      const regex = /[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u
+      return regex.test(char)
+    }
+
+    // 计算居中、距底部 marginFromBottom 的 Y 坐标
+    const posY = playResY - marginFromBottom
+    const posX = Math.round(playResX / 2) // 水平居中
+
+    const assHeader = `[Script Info]
+Title: Generated Subtitles
+PlayResX: ${playResX}
+PlayResY: ${playResY}
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,5,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`
+
+    const formatTimestamp = (ms: number): string => {
+      const totalSeconds = Math.floor(ms / 1000)
+      const hours = Math.floor(totalSeconds / 3600)
+      const minutes = Math.floor((totalSeconds % 3600) / 60)
+      const seconds = totalSeconds % 60
+      const centiseconds = Math.floor((ms % 1000) / 10)
+      return `${String(hours).padStart(1, '0')}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`
+    }
+
+    const dialogueLines: string[] = []
+
+    const flushSentence = () => {
+      if (currentSentence.length === 0) return
+      const firstWord = currentSentence[0]
+      const lastWord = currentSentence[currentSentence.length - 1]
+
+      const textList = currentSentence.map((w) => w.text.Text)
+      const joinedText = textList.reduce((acc, text, index) => {
+        if (index === 0) return text
+        const prevChar = acc[acc.length - 1]
+        const currChar = text[0]
+        const prevIsCompact = isNoSpaceScript(prevChar)
+        const currIsCompact = isNoSpaceScript(currChar)
+        return acc + (prevIsCompact && currIsCompact ? '' : ' ') + text
+      }, '')
+
+      const startMs = firstWord.Offset / 10_000
+      const endMs = (lastWord.Offset + lastWord.Duration) / 10_000
+      const startTs = formatTimestamp(startMs)
+      const endTs = formatTimestamp(endMs)
+
+      // \pos(x,y) 定位，\fs 字体大小，\c 填充色(白色)，\3c 描边色(黑色)，\4a 阴影透明度
+      const styledText = `{\\pos(${posX},${posY})\\fs${fontSize}\\c&H00FFFFFF\\3c&H000000\\4a&H00}${joinedText}`
+      dialogueLines.push(`Dialogue: 0,${startTs},${endTs},Default,,0,0,0,,${styledText}`)
+    }
+
+    this.wordList.forEach((word, index) => {
+      const vocieGap = () =>
+        word.Offset - (this.wordList[index - 1].Offset + this.wordList[index - 1].Duration) >
+        100 * 10 ** 4
+
+      if (index !== 0 && vocieGap()) {
+        flushSentence()
+        currentSentence = [word]
+        return
+      }
+
+      currentSentence.push(word)
+    })
+
+    if (currentSentence.length) {
+      flushSentence()
+      currentSentence = []
+    }
+
+    return assHeader + dialogueLines.join('\n')
+  }
+
   getCaptionSrtString(): string {
     let srtCaptionList: SubtitleNodeList = []
     let currentSentence: WordBoundary[] = []
@@ -392,9 +498,6 @@ class SynthesisResultImpl implements SynthesisResult {
     }
 
     this.wordList.forEach((word, index) => {
-      // const tooLong = () =>
-      //   currentSentence.map((sentence) => sentence.text.Text).join('').length > 24
-
       const vocieGap = () =>
         word.Offset - (this.wordList[index - 1].Offset + this.wordList[index - 1].Duration) >
         100 * 10 ** 4

@@ -12,7 +12,7 @@ import {
   SelectFolderParams,
   StatEventParams,
 } from './types'
-import { TtsSynthesizeParams, TtsSynthesizeToFileParams } from './tts/types'
+import { EdgeTtsSynthesizeToFileParams } from './tts/types'
 import { RenderVideoParams } from './ffmpeg/types'
 import type { VLApiConfig, MatchVideoSegmentsParams } from './vl/types'
 
@@ -56,10 +56,16 @@ contextBridge.exposeInMainWorld('electron', {
   selectFolder: (params: SelectFolderParams) => ipcRenderer.invoke('select-folder', params),
   listFilesFromFolder: (params: ListFilesFromFolderParams) =>
     ipcRenderer.invoke('list-files-from-folder', params),
-  ttsSynthesizeToUrl: (params: TtsSynthesizeParams) =>
+  ttsSynthesizeToUrl: (params: any) =>
     ipcRenderer.invoke('tts-synthesize-to-url', params),
-  ttsSynthesizeToFile: (params: TtsSynthesizeToFileParams) =>
+  ttsSynthesizeToFile: (params: any) =>
     ipcRenderer.invoke('tts-synthesize-to-file', params),
+  // Edge TTS（免费，支持字幕）
+  edgeTtsGetVoiceList: () => ipcRenderer.invoke('edge-tts-get-voice-list'),
+  edgeTtsSynthesizeToBase64: (params: any) =>
+    ipcRenderer.invoke('edge-tts-synthesize-to-base64', params),
+  edgeTtsSynthesizeToFile: (params: EdgeTtsSynthesizeToFileParams) =>
+    ipcRenderer.invoke('edge-tts-synthesize-to-file', params),
   renderVideo: (params: RenderVideoParams) => ipcRenderer.invoke('render-video', params),
   statTrack: (params: StatEventParams) => ipcRenderer.invoke('stat-track', params),
   // VL 视觉大模型相关

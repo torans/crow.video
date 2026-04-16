@@ -39,18 +39,24 @@ export const useAppStore = defineStore(
     // 素材文件路径列表，用于智能匹配选片时限定范围
     const videoAssets = ref<string[]>([])
 
-    // 语音合成（Qwen TTS）
+    // 语音合成（Edge TTS 免费版）
     const ttsConfig = ref({
-      apiKey: '',
-      apiUrl: 'https://dashscope.aliyuncs.com/api/v1/services/aigc/multimodal-generation/generation',
-      model: 'qwen3-tts-flash',
-      voice: 'Cherry',
-      languageType: 'Chinese',
+      voice: 'zh-CN-XiaoxiaoNeural',
+      pitch: 0,
+      rate: 0,
+      volume: 0,
     })
     const updateTtsConfig = (newConfig: typeof ttsConfig.value) => {
       ttsConfig.value = newConfig
     }
     const tryListeningText = ref('Hello，欢迎使用乌鸦视频工厂！')
+
+    // Edge TTS 语音列表相关
+    const originalVoicesList = ref<any[]>([])
+    const language = ref('Chinese')
+    const gender = ref<'Male' | 'Female'>('Female')
+    const voice = ref<any | null>(null)
+    const speed = ref(0)
 
     // 合成配置
     const renderConfig = ref({
@@ -108,6 +114,12 @@ export const useAppStore = defineStore(
       ttsConfig,
       updateTtsConfig,
       tryListeningText,
+
+      originalVoicesList,
+      language,
+      gender,
+      voice,
+      speed,
 
       renderConfig,
       autoBatch,

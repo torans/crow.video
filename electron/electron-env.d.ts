@@ -39,12 +39,14 @@ interface Window {
     listFilesFromFolder: (
       params: import('./types').ListFilesFromFolderParams,
     ) => Promise<import('./types').ListFilesFromFolderRecord[]>
-    ttsSynthesizeToUrl: (
-      params: import('./tts/types').TtsSynthesizeParams,
-    ) => Promise<string>
-    ttsSynthesizeToFile: (
-      params: import('./tts/types').TtsSynthesizeToFileParams,
-    ) => Promise<import('./tts/types').TtsSynthesizeToFileResult>
+    ttsSynthesizeToUrl: (params: any) => Promise<string>
+    ttsSynthesizeToFile: (params: any) => Promise<any>
+    // Edge TTS（免费，支持字幕）
+    edgeTtsGetVoiceList: () => Promise<any>
+    edgeTtsSynthesizeToBase64: (params: any) => Promise<string>
+    edgeTtsSynthesizeToFile: (
+      params: import('./tts/types').EdgeTtsSynthesizeToFileParams,
+    ) => Promise<import('./tts/types').EdgeTtsSynthesizeToFileResult>
     renderVideo: (
       params: import('./ffmpeg/types').RenderVideoParams,
     ) => Promise<import('./ffmpeg/types').ExecuteFFmpegResult>

@@ -169,6 +169,7 @@ const handleRenderVideo = async () => {
     appStore.updateRenderStatus(RenderStatus.SynthesizedSpeech)
     const ttsResult = await TtsControlInstance.value?.synthesizedSpeechToFile({
       text,
+      withCaption: true,
     })
     if (ttsResult?.duration === undefined) {
       throw new Error(t('features.tts.errors.fileCorrupt'))
@@ -208,7 +209,10 @@ const handleRenderVideo = async () => {
             productTags,
             productSceneTags,
             targetDuration: ttsResult.duration,
-            videoPaths: appStore.videoAssets.length > 0 ? JSON.parse(JSON.stringify(appStore.videoAssets)) : undefined,
+            videoPaths:
+              appStore.videoAssets.length > 0
+                ? JSON.parse(JSON.stringify(appStore.videoAssets))
+                : undefined,
             text,
             matchMode: appStore.renderConfig.matchMode ?? 'auto',
           })
@@ -261,6 +265,7 @@ const handleRenderVideo = async () => {
         height: appStore.renderConfig.outputSize.height,
       },
       outputDuration: String(ttsResult.duration),
+      subtitleFile: ttsResult.subtitlePath,
       outputPath:
         appStore.renderConfig.outputPath.replace(/\\/g, '/') +
         '/' +
@@ -402,8 +407,8 @@ const handleCancelRender = () => {
 }
 
 .home-column-stack--execute-top {
-  flex: 0 0 390px;
-  min-height: 390px;
+  flex: 0 0 300px;
+  min-height: 300px;
   overflow: hidden;
 }
 

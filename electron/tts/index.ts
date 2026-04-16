@@ -1,20 +1,20 @@
 import fs from 'node:fs'
 import path from 'node:path'
-import axios from 'axios'
+import { EdgeTTS } from '../lib/edge-tts'
 import { parseBuffer } from 'music-metadata'
 import {
-  TtsSynthesizeParams,
-  TtsSynthesizeToFileParams,
-  TtsSynthesizeToFileResult,
-  DashScopeResponse,
+  EdgeTtsSynthesizeCommonParams,
+  EdgeTtsSynthesizeToFileParams,
+  EdgeTtsSynthesizeToFileResult,
 } from './types'
 import { getAppTempPath } from '../lib/tools'
 import { app } from 'electron'
 
+const edgeTts = new EdgeTTS()
 const setupTime = new Date().getTime()
 
 export function getTempTtsVoiceFilePath() {
-  return path.join(getAppTempPath(), `temp-tts-voice-${setupTime}.wav`).replace(/\\/g, '/')
+  return path.join(getAppTempPath(), `temp-tts-voice-${setupTime}.mp3`).replace(/\\/g, '/')
 }
 
 export function clearCurrentTtsFiles() {
@@ -22,8 +22,12 @@ export function clearCurrentTtsFiles() {
   if (fs.existsSync(voicePath)) {
     fs.unlinkSync(voicePath)
   }
+  const assPath = path.join(path.dirname(voicePath), path.basename(voicePath, '.mp3') + '.ass')
+  if (fs.existsSync(assPath)) {
+    fs.unlinkSync(assPath)
+  }
   // 兼容旧的 .srt 文件清理
-  const srtPath = path.join(path.dirname(voicePath), path.basename(voicePath, '.wav') + '.srt')
+  const srtPath = path.join(path.dirname(voicePath), path.basename(voicePath, '.mp3') + '.srt')
   if (fs.existsSync(srtPath)) {
     fs.unlinkSync(srtPath)
   }
@@ -33,85 +37,46 @@ app.on('before-quit', () => {
   clearCurrentTtsFiles()
 })
 
-/**
- * 调用 DashScope Qwen TTS API 进行语音合成
- * 返回音频文件的 URL
- */
-async function callQwenTtsApi(params: TtsSynthesizeParams): Promise<DashScopeResponse> {
-  const { text, config } = params
-  const response = await axios.post<DashScopeResponse>(
-    config.apiUrl,
-    {
-      model: config.model,
-      input: {
-        text,
-        voice: config.voice,
-        language_type: config.languageType,
-      },
-    },
-    {
-      headers: {
-        Authorization: `Bearer ${config.apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      timeout: 60000,
-    },
-  )
-
-  const data = response.data
-  if (data.code && data.code !== '') {
-    throw new Error(`TTS API 错误: ${data.code} - ${data.message}`)
-  }
-  if (!data.output?.audio?.url) {
-    throw new Error('TTS API 未返回音频 URL')
-  }
-
-  return data
+export async function edgeTtsGetVoiceList() {
+  return edgeTts.getVoices()
 }
 
-/**
- * 从 URL 下载音频文件到本地
- */
-async function downloadAudio(url: string, outputPath: string): Promise<Buffer> {
-  const response = await axios.get(url, {
-    responseType: 'arraybuffer',
-    timeout: 60000,
-  })
-  const buffer = Buffer.from(response.data)
-  if (!fs.existsSync(path.dirname(outputPath))) {
-    fs.mkdirSync(path.dirname(outputPath), { recursive: true })
-  }
-  fs.writeFileSync(outputPath, buffer)
-  return buffer
+export async function edgeTtsSynthesizeToBase64(params: EdgeTtsSynthesizeCommonParams) {
+  const { text, voice, options } = params
+  const result = await edgeTts.synthesize(text, voice, options)
+  return result.toBase64()
 }
 
-/**
- * 合成语音并返回音频 URL（用于试听）
- */
-export async function ttsSynthesizeToUrl(params: TtsSynthesizeParams): Promise<string> {
-  const data = await callQwenTtsApi(params)
-  return data.output.audio.url
-}
+export async function edgeTtsSynthesizeToFile(
+  params: EdgeTtsSynthesizeToFileParams,
+): Promise<EdgeTtsSynthesizeToFileResult> {
+  const { text, voice, options, withCaption } = params
+  const result = await edgeTts.synthesize(text, voice, options)
 
-/**
- * 合成语音并保存到文件
- */
-export async function ttsSynthesizeToFile(
-  params: TtsSynthesizeToFileParams,
-): Promise<TtsSynthesizeToFileResult> {
-  const data = await callQwenTtsApi(params)
-
-  const outputPath = params.outputPath ?? getTempTtsVoiceFilePath()
+  let outputPath = params.outputPath ?? getTempTtsVoiceFilePath()
   if (fs.existsSync(outputPath)) {
     fs.unlinkSync(outputPath)
   }
+  if (!fs.existsSync(path.dirname(outputPath))) {
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+  }
+  await result.toFile(outputPath)
 
-  const buffer = await downloadAudio(data.output.audio.url, outputPath)
+  let subtitlePath: string | undefined
+  if (withCaption) {
+    // 使用 ASS 格式（支持字体大小和位置控制），距底部 300px，字体 56
+    const assString = result.getCaptionAssString(80, 300, 1920, 1080)
+    subtitlePath = path.join(path.dirname(outputPath), path.basename(outputPath, '.mp3') + '.ass')
+    if (fs.existsSync(subtitlePath)) {
+      fs.unlinkSync(subtitlePath)
+    }
+    fs.writeFileSync(subtitlePath, assString)
+  }
 
-  // 解析音频元数据获取时长
+  // 指定 mimeType 为 audio/mpeg (MP3)，避免自动检测格式失败
   let duration = 0
   try {
-    const metadata = await parseBuffer(buffer, { mimeType: 'audio/wav' })
+    const metadata = await parseBuffer(result.getBuffer(), { mimeType: 'audio/mpeg' })
     duration = metadata.format?.duration ?? 0
   } catch (error: any) {
     throw new Error(`音频元数据解析失败: ${error?.message ?? String(error)}`)
@@ -121,5 +86,8 @@ export async function ttsSynthesizeToFile(
     throw new Error('音频时长无效，请检查TTS配置或网络连接')
   }
 
-  return { duration }
+  return {
+    duration,
+    subtitlePath,
+  }
 }
