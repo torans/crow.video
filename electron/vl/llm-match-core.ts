@@ -60,6 +60,12 @@ function isCtaText(text: string): boolean {
 export function detectSentenceStage(text: string, index: number, total: number): SegmentStage {
   const normalized = text.trim()
 
+  // 前2句默认 hook（除非明确是 cta/scene）
+  if (index <= 2) {
+    if (isCtaText(normalized)) return 'cta'
+    if (isSceneText(normalized)) return 'scene'
+    return 'hook'
+  }
   if (index === 0 || HOOK_HINTS.some((keyword) => normalized.includes(keyword))) return 'hook'
   if (isCtaText(normalized)) return 'cta'
   if (isSceneText(normalized)) return 'scene'
@@ -287,11 +293,11 @@ function buildTailFillRanked(
     .map((candidate, index) => {
       const existingRanges = usedRanges.get(candidate.videoPath) || []
       const clipEnd = candidate.timestamp + (candidate.availableDuration || 0)
+      // tail-fill 阶段：重叠的片段也保留（允许复用同一视频的不同时间位置）
       let score = candidate.availableDuration || 0
-      if (overlaps(existingRanges, candidate.timestamp, clipEnd)) score -= 1000
       return { index, score }
     })
-    .filter((item) => item.score > -500)
+    .filter((item) => item.score > 0)
     .sort((a, b) => b.score - a.score)
     .map((item) => item.index)
 }
@@ -388,30 +394,38 @@ export function assembleSegments(
   let tailRanked = buildTailFillRanked(candidates, usedRanges)
 
   while (targetDuration - currentDuration > 0.12 && tailRanked.length > 0) {
-    const chosenIndex = tailRanked.shift()
-    if (chosenIndex === undefined) break
+    let chosenIndex = null
 
-    const candidate = candidates[chosenIndex]
-    const videoDur = candidate.videoDur || 15
-    const clipStart = candidate.timestamp
-    const clipEnd = Math.min(videoDur, clipStart + (candidate.availableDuration || 0))
-    const existingRanges = usedRanges.get(candidate.videoPath) || []
-    const window = findAvailableWindow(existingRanges, clipStart, clipEnd, targetDuration - currentDuration)
+    // 找一个有可用 window 的候选（不提前移除）
+    for (const idx of tailRanked) {
+      const candidate = candidates[idx]
+      const videoDur = candidate.videoDur || 15
+      const clipStart = candidate.timestamp
+      const clipEnd = Math.min(videoDur, clipStart + (candidate.availableDuration || 0))
+      const existingRanges = usedRanges.get(candidate.videoPath) || []
+      const window = findAvailableWindow(existingRanges, clipStart, clipEnd, targetDuration - currentDuration)
+      if (window) {
+        chosenIndex = idx
+        const [trimStart, safeEnd] = window
+        const clipDuration = safeEnd - trimStart
 
-    if (!window) continue
-    const [trimStart, safeEnd] = window
-    const clipDuration = safeEnd - trimStart
+        existingRanges.push([trimStart, safeEnd])
+        usedRanges.set(candidate.videoPath, existingRanges)
 
-    existingRanges.push([trimStart, safeEnd])
-    usedRanges.set(candidate.videoPath, existingRanges)
+        console.log(
+          `[assemble-tail-fill] ${path.basename(candidate.videoPath)} raw_ts=${candidate.timestamp} videoDur=${videoDur} remain=${(targetDuration - currentDuration).toFixed(3)} → trim=${trimStart}-${safeEnd.toFixed(3)}`,
+        )
 
-    console.log(
-      `[assemble-tail-fill] ${path.basename(candidate.videoPath)} raw_ts=${candidate.timestamp} videoDur=${videoDur} remain=${(targetDuration - currentDuration).toFixed(3)} → trim=${trimStart}-${safeEnd.toFixed(3)}`,
-    )
+        videoFiles.push(candidate.videoPath)
+        timeRanges.push([trimStart.toFixed(3), safeEnd.toFixed(3)])
+        currentDuration += clipDuration
+        break
+      }
+    }
 
-    videoFiles.push(candidate.videoPath)
-    timeRanges.push([trimStart.toFixed(3), safeEnd.toFixed(3)])
-    currentDuration += clipDuration
+    if (chosenIndex === null) break
+    // 移除用过的候选
+    tailRanked = tailRanked.filter((idx) => idx !== chosenIndex)
   }
 
   return { videoFiles, timeRanges }

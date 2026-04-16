@@ -109,9 +109,7 @@ export async function fetchTopKCandidates(
     }
   })
 
-  return scored
-    .sort((a, b) => b.relevance - a.relevance)
-    .slice(0, k)
+  return scored.sort((a, b) => b.relevance - a.relevance).slice(0, k)
 }
 
 function buildStageAwareCandidateList(
@@ -217,8 +215,10 @@ ${candidateList}
       const row = result[index] || {}
       const indices = [
         Number(row.primarySegmentIndex),
-        ...((Array.isArray(row.backupSegmentIndices) ? row.backupSegmentIndices : []).map(Number)),
-      ].filter((value: number) => Number.isInteger(value) && value >= 0 && value < candidates.length)
+        ...(Array.isArray(row.backupSegmentIndices) ? row.backupSegmentIndices : []).map(Number),
+      ].filter(
+        (value: number) => Number.isInteger(value) && value >= 0 && value < candidates.length,
+      )
 
       return {
         stage: isStage(row.stage) ? row.stage : sentence.stage,
@@ -285,7 +285,10 @@ export async function matchVideoSegmentsByLLM(params: {
     (sum, [start, end]) => sum + (Number.parseFloat(end) - Number.parseFloat(start)),
     0,
   )
-  const targetDuration = sentences.reduce((sum, sentence) => sum + (sentence.end - sentence.start), 0)
+  const targetDuration = sentences.reduce(
+    (sum, sentence) => sum + (sentence.end - sentence.start),
+    0,
+  )
 
   console.log(
     `[llm-match] assembled segments=${assembled.videoFiles.length} total=${totalDuration.toFixed(3)} target=${targetDuration.toFixed(3)}`,

@@ -194,66 +194,37 @@ const languageOptions = [
   { label: 'Tiếng Việt', value: 'Tiếng Việt' },
 ]
 
-/**
- * 核心升级：动态参数对齐系统
- */
 const buildSystemPrompt = (productContext?: string): string => {
+  if (productContext) return productContext
   const lang = appStore.llmConfig.language || '中文'
   const product = appStore.currentProduct
-  const isSceneMode = appStore.renderConfig.matchMode === 'scene'
 
   const parts: string[] = []
-  parts.push(`你是一个专业短视频口播文案导演。`)
-  parts.push(`【核心任务】生成一段适配产品素材库的口播文案，文案结构必须严格遵守：Hook（黄金3秒） -> Content（产品价值） -> Scene（使用场景/情境代入） -> CTA（产品展示+转化引导）。`)
-  parts.push(`【全局原则】：
-1. 全文只输出一段自然口播，不要标题、编号、括号说明、标签或 markdown。
-2. 严禁负面抱怨、翻车、问题对比、售后类表达；素材库以正向展示为主，声画必须统一。
-3. 语言要口语化、像真人在镜头前直接说，但不能空泛。
-4. 每一段都要能被画面承接：Hook 对应动态抓眼镜头，Content 对应参数/细节特写，Scene 对应真实使用场景，CTA 对应成果展示或产品展示。
-5. 不要反复套用同一开场模板，尽量变换句式、节奏和切入角度。`)
+  parts.push(`你是一个高端渔具品牌的视觉营销专家。`)
+  parts.push(`【核心任务】：撰写一段适配“纯产品展示/高清细节镜头”的短视频口播文案。`)
 
-  if (productContext) {
-    parts.push(`\n【外部产品上下文】：`)
-    parts.push(productContext)
-  }
+  // 核心约束：声画同步逻辑
+  parts.push(`\n【视觉匹配准则】：
+1. 禁止负面情绪：素材库全是高清美感画面，文案禁止出现“炸线、烦人、垃圾”等负面词汇。
+2. 显性卖点对齐：文案必须【显性化】描述产品特征，确保剪辑系统能通过文案关键词匹配到特写画面。`)
 
   if (product) {
-    parts.push(`\n【当前产品动态数据】：`)
-    parts.push(`- 名称：${product.name}`)
-    if (product.features) parts.push(`- 工艺卖点（对应特写镜头）：${product.features}`)
-    if (product.highlights) parts.push(`- 性能亮点（对应展示镜头）：${product.highlights}`)
-    if (product.target_audience) parts.push(`- 目标人群：${product.target_audience}`)
+    parts.push(`\n【必须使用的产品数据】：`)
+    parts.push(`- 产品名称：${product.name}`)
+    if (product.features) parts.push(`- 核心卖点（对应工艺特写）：${product.features}`)
+    if (product.highlights) parts.push(`- 亮点描述（对应效果展示）：${product.highlights}`)
+    if (product.target_audience) parts.push(`- 目标受众：${product.target_audience}`)
 
-    if (isSceneMode) {
-      parts.push(`\n【场景模式结构要求】：
-- Hook：开头一句必须直接抓人，优先从动作感、结果感、上手感切入，不能空喊口号。
-- Content：必须有 3 句连续内容，明确说出产品卖点、参数、细节或使用价值，至少落到 3 个具体点。
-- Scene：必须有 1 句独立的“使用场景/情境代入”，让人能脑补在户外、水边、作钓或上手使用的状态；不要写故障对比。
-- CTA：最后 1 句必须是明确收束和转化，允许自然，不要太硬广，但必须带动作导向，比如“备一卷、安排上、带上它、去试试”。`)
-    } else {
-      parts.push(`\n【产品模式结构要求】：
-- Hook：开头先给一个抓眼的性能感受或直观结果。
-- Content：主体必须有 3 句连续内容，重点讲产品细节、参数、质感、性能价值。
-- Scene：用一句简短口播带出真实使用情境，让画面不只剩静态参数。
-- CTA：最后一句必须是明确收束和轻转化表达，不能只是继续夸产品。`)
-    }
+    parts.push(`\n【撰写指令】：
+1. 提取上述“核心卖点”和“亮点描述”中的具体词汇编织进文案。
+2. 每一句台词必须对应一个具体的【视觉动作】或【材质细节】。
+3. 开头用“专业降维打击”的方式切入，直接展示产品的高级感。
+4. 风格：沉稳、专业、口语化，字数控制在 100-130 字。`)
+  } else {
+    parts.push(`\n请撰写一段通用的、高质感的渔具带货文案，突出专业感。`)
   }
 
-  parts.push(`\n【输出要求】：
-- 语言：${lang}
-- 字数：120-170字左右
-- 固定输出 6 句：
-  第1句 Hook
-  第2-4句 Content
-  第5句 Scene
-  第6句 CTA
-- Content 三句的总字数必须占全文 55% 以上。
-- Hook 尽量短促有力；Content 信息最饱满；Scene 要有代入感；CTA 要有收束感。
-- 必须直接复用产品信息中的关键词和卖点词，方便剪辑系统做语义匹配。
-- 不要输出“第一、第二、最后”这类显式分段词。
-- 第5句必须出现能体现使用情境的词，如“岸边、户外、水边、作钓、实战、上手、出门”中的至少一个。
-- 第6句必须出现转化或行动导向词，如“备一卷、安排、带上、试试、入手、上链接”中的至少一个。
-- 直接输出最终口播文案。`)
+  parts.push(`\n必须使用${lang}输出。只给正文，不给标题。`)
 
   return parts.join('\n')
 }
@@ -289,10 +260,12 @@ const handleGenerate = async (options?: { noToast?: boolean; productContext?: st
       abortSignal: abortController.value.signal,
     })
 
+    let rawText = ''
     for await (const textPart of result.textStream) {
-      outputText.value += textPart
+      rawText += textPart
     }
-    return outputText.value
+    outputText.value = rawText
+    return rawText
   } catch (error: any) {
     if (error?.name !== 'AbortError') {
       const errorMessage = error?.error?.message || error?.message || String(error)
