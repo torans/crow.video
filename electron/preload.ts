@@ -67,6 +67,13 @@ contextBridge.exposeInMainWorld('electron', {
   edgeTtsSynthesizeToFile: (params: EdgeTtsSynthesizeToFileParams) =>
     ipcRenderer.invoke('edge-tts-synthesize-to-file', params),
   renderVideo: (params: RenderVideoParams) => ipcRenderer.invoke('render-video', params),
+  // LLM 音视频同步匹配
+  vlMatchByLLM: (params: {
+    subtitleFile: string
+    videoAssets: string[]
+    productInfo?: { name?: string; features?: string; highlights?: string; targetAudience?: string }
+    llmConfig: { apiUrl: string; apiKey: string; modelName: string }
+  }) => ipcRenderer.invoke('vl-match-by-llm', params),
   statTrack: (params: StatEventParams) => ipcRenderer.invoke('stat-track', params),
   // VL 视觉大模型相关
   vlTestConnection: (params: VLApiConfig) => ipcRenderer.invoke('vl-test-connection', params),

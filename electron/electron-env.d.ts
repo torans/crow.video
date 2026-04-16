@@ -50,6 +50,13 @@ interface Window {
     renderVideo: (
       params: import('./ffmpeg/types').RenderVideoParams,
     ) => Promise<import('./ffmpeg/types').ExecuteFFmpegResult>
+    // LLM 音视频同步匹配
+    vlMatchByLLM: (params: {
+      subtitleFile: string
+      videoAssets: string[]
+      productInfo?: { name?: string; features?: string; highlights?: string; targetAudience?: string }
+      llmConfig: { apiUrl: string; apiKey: string; modelName: string }
+    }) => Promise<{ videoFiles: string[]; timeRanges: [string, string][] }>
     statTrack: (params: import('./types').StatEventParams) => Promise<void>
     // VL 视觉大模型相关
     vlTestConnection: (params: import('./vl/types').VLApiConfig) => Promise<boolean>

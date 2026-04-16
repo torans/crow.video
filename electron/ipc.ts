@@ -13,6 +13,9 @@ import { edgeTtsGetVoiceList, edgeTtsSynthesizeToBase64, edgeTtsSynthesizeToFile
 import { renderVideo } from './ffmpeg'
 import { sendStatEvent } from './lib/stat'
 import { testVLConnection } from './vl'
+import { matchVideoSegments } from './vl/match'
+import { getAnalysisStats } from './vl/match'
+import { matchVideoSegmentsByLLM } from './vl/llm-match'
 import { analyzeVideoAssets, clearVideoAnalysis } from './vl/analyze-video'
 import {
   analyzeProductReference,
@@ -23,7 +26,6 @@ import {
   deleteProductReference,
   updateProductReferenceAnalysis,
 } from './vl/analyze-product'
-import { matchVideoSegments, getAnalysisStats } from './vl/match'
 import type { VLApiConfig } from './vl/types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -243,6 +245,12 @@ export default function initIPC() {
   ipcMain.handle('vl-match-video-segments', (_event, params) => {
     console.log('[vl-match-video-segments IPC] 被调用了！params=', JSON.stringify(params, null, 2))
     return matchVideoSegments(params)
+  })
+
+  // LLM 智能匹配选片（音视频同步）
+  ipcMain.handle('vl-match-by-llm', (_event, params) => {
+    console.log('[vl-match-by-llm IPC] 被调用了！params=', JSON.stringify(params, null, 2))
+    return matchVideoSegmentsByLLM(params)
   })
 
   // === 产品参考管理 ===

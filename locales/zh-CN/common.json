@@ -243,6 +243,7 @@
         "startLabel": "开始生成",
         "stopLabel": "停止生成",
         "autoBatch": "自动批量生成",
+        "llmSyncEnabled": "音视频同步",
         "bgmFolderLabel": "背景音乐文件夹（随机选取.mp3，为空则无背景音）",
         "output": {
           "width": "导出视频宽度",

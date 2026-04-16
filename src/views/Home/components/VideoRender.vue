@@ -174,6 +174,13 @@
 
         <div class="render-panel__actions">
           <v-switch
+            v-model="appStore.renderConfig.llmSyncEnabled"
+            :label="t('features.render.config.llmSyncEnabled')"
+            density="compact"
+            hide-details
+            :disabled="taskInProgress"
+          />
+          <v-switch
             v-model="appStore.autoBatch"
             :label="t('features.render.config.autoBatch')"
             density="compact"

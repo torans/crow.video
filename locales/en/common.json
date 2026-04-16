@@ -243,6 +243,7 @@
         "startLabel": "Start Rendering",
         "stopLabel": "Stop Rendering",
         "autoBatch": "Auto batch render",
+        "llmSyncEnabled": "AV Sync",
         "bgmFolderLabel": "Background music folder (.mp3, pick randomly)",
         "output": {
           "width": "Output width",

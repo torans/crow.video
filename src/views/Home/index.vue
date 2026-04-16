@@ -76,13 +76,7 @@ const buildProductContext = (): string | undefined => {
   if (!product) return undefined
 
   const parts: string[] = []
-  parts.push(`你是一个专业的短视频口播文案撰写人。请严格遵守以下规则：`)
-  parts.push(`1. 只输出口播文案正文，不要输出标题、标签、分段、markdown格式`)
-  parts.push(`2. 文案必须是口语化的，像真人说话一样自然流畅`)
-  parts.push(`3. 字数严格控制在80-150字，适合15-30秒的短视频`)
-  parts.push(`4. 必须突出产品卖点，有吸引力和购买欲`)
-  parts.push(``)
-  parts.push(`产品信息：`)
+  parts.push(`补充产品信息如下，请优先围绕这些卖点写：`)
   parts.push(`产品名称：${product.name}`)
   if (product.features) parts.push(`核心功能：${product.features}`)
   if (product.highlights) parts.push(`产品亮点：${product.highlights}`)
@@ -187,8 +181,46 @@ const handleRenderVideo = async () => {
 
     let videoSegments: { videoFiles: string[]; timeRanges: [string, string][] } | null = null
 
-    // 尝试智能匹配选片
-    if (appStore.smartMatchEnabled && appStore.currentProduct) {
+    // LLM 音视频同步匹配优先
+    if (appStore.renderConfig.llmSyncEnabled) {
+      if (!ttsResult.subtitlePath) {
+        throw new Error('LLM 匹配模式需要字幕文件，请确保 TTS 合成时开启字幕')
+      }
+      if (!appStore.llmConfig.apiKey) {
+        throw new Error('LLM 匹配模式需要配置 LLM API Key')
+      }
+      if (appStore.videoAssets.length === 0) {
+        throw new Error('LLM 匹配模式需要先添加视频素材')
+      }
+      try {
+        const matched = await window.electron.vlMatchByLLM({
+          subtitleFile: ttsResult.subtitlePath,
+          videoAssets: JSON.parse(JSON.stringify(appStore.videoAssets)),
+          productInfo: appStore.currentProduct
+            ? {
+                name: appStore.currentProduct.name,
+                features: appStore.currentProduct.features || undefined,
+                highlights: appStore.currentProduct.highlights || undefined,
+                targetAudience: appStore.currentProduct.target_audience || undefined,
+              }
+            : undefined,
+          llmConfig: {
+            apiUrl: appStore.llmConfig.apiUrl,
+            apiKey: appStore.llmConfig.apiKey,
+            modelName: appStore.llmConfig.modelName,
+          },
+        })
+        if (matched.videoFiles.length > 0) {
+          videoSegments = matched
+          console.log('使用 LLM 音视频同步匹配，片段数:', matched.videoFiles.length)
+        }
+      } catch (e) {
+        console.warn('LLM 匹配失败，回退到本地匹配:', e)
+      }
+    }
+
+    // 本地智能匹配选片（llmSyncEnabled 为 false 或 LLM 失败时）
+    if (!videoSegments && appStore.smartMatchEnabled && appStore.currentProduct) {
       try {
         let productColors: string[] = []
         let productTags: string[] = []
@@ -226,12 +258,12 @@ const handleRenderVideo = async () => {
             // 如果匹配时长 >= 目标的 80%，直接使用；否则回退到随机
             if (matchedDuration >= ttsResult.duration * 0.8) {
               videoSegments = matched
-              console.log('使用智能匹配选片，匹配时长:', matchedDuration)
+              console.log('使用本地智能匹配选片，匹配时长:', matchedDuration)
             }
           }
         }
       } catch (e) {
-        console.warn('智能匹配失败，回退到随机选片:', e)
+        console.warn('本地智能匹配失败，回退到随机选片:', e)
       }
     }
 
