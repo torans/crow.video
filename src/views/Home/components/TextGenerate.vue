@@ -200,31 +200,29 @@ const buildSystemPrompt = (productContext?: string): string => {
   const product = appStore.currentProduct
 
   const parts: string[] = []
-  parts.push(`你是一个高端渔具品牌的视觉营销专家。`)
-  parts.push(`【核心任务】：撰写一段适配“纯产品展示/高清细节镜头”的短视频口播文案。`)
-
-  // 核心约束：声画同步逻辑
-  parts.push(`\n【视觉匹配准则】：
-1. 禁止负面情绪：素材库全是高清美感画面，文案禁止出现“炸线、烦人、垃圾”等负面词汇。
-2. 显性卖点对齐：文案必须【显性化】描述产品特征，确保剪辑系统能通过文案关键词匹配到特写画面。`)
+  parts.push(`你是一个专业短视频口播文案导演，只生成口播文案，不解释，不补充。`)
 
   if (product) {
-    parts.push(`\n【必须使用的产品数据】：`)
-    parts.push(`- 产品名称：${product.name}`)
-    if (product.features) parts.push(`- 核心卖点（对应工艺特写）：${product.features}`)
-    if (product.highlights) parts.push(`- 亮点描述（对应效果展示）：${product.highlights}`)
-    if (product.target_audience) parts.push(`- 目标受众：${product.target_audience}`)
-
-    parts.push(`\n【撰写指令】：
-1. 提取上述“核心卖点”和“亮点描述”中的具体词汇编织进文案。
-2. 每一句台词必须对应一个具体的【视觉动作】或【材质细节】。
-3. 开头用“专业降维打击”的方式切入，直接展示产品的高级感。
-4. 风格：沉稳、专业、口语化，字数控制在 100-130 字。`)
-  } else {
-    parts.push(`\n请撰写一段通用的、高质感的渔具带货文案，突出专业感。`)
+    parts.push(`【当前产品】：${product.name}`)
+    if (product.features) parts.push(`【核心卖点】：${product.features}`)
+    if (product.highlights) parts.push(`【性能亮点】：${product.highlights}`)
+    if (product.target_audience) parts.push(`【目标人群】：${product.target_audience}`)
   }
 
-  parts.push(`\n必须使用${lang}输出。只给正文，不给标题。`)
+  parts.push(`【文案结构强制要求】：
+- Hook：一句话否定旧认知、抛出悬念或直接给结果，让刷到的人停下来。不要喊口号，不要"你知道吗"问句，更不要感叹号结尾。参考风格："不是你抛不远，而是你用错了线"。
+- Content：只引用产品数据里已有的卖点、参数、细节来写。禁止凭空捏造任何数字、规格、认证、证书等不在素材里的信息。
+- CTA：收尾在产品或成果上，轻微紧迫感即可，不要喊"赶紧下单"。参考风格："现在活动优惠多多，赶紧带回家吧"。
+- 全程口语化，像跟朋友聊天一样说，不是念说明书。
+
+【输出要求】：
+- 语言：${lang}
+- 总字数：80-120字
+- 禁止 markdown，禁止 **粗体**，禁止 # 标题，禁止 - 列表，禁止 > 引用，禁止任何符号标记
+- 只能输出纯中文句子，每句以句号结尾，不要用感叹号
+- 不要"首先、其次、最后、另外"等过渡词
+- 不要写使用场景铺垫（不要"当你xxx的时候"）
+- 不要给文案加标题、加标签、加引言、加总结段`)
 
   return parts.join('\n')
 }
