@@ -475,6 +475,9 @@ export async function matchVideoSegments(
       .map((s, i) => ({ i, dur: s.end - s.start }))
       .sort((a, b) => b.dur - a.dur)
 
+    // 记录每个 slot 选中的片段（用 slotIdx 保持原始时间顺序）
+    const slotSegmentMap: Array<{ slotIdx: number; videoPath: string; timeRange: [string, string] }> = []
+
     for (const { i } of sortedIndices) {
       const slot = sentences[i]
       const slotDuration = slot.end - slot.start
@@ -517,6 +520,12 @@ export async function matchVideoSegments(
         if (tryAddSegment(candidate, slotRemaining)) {
           const filled = currentDuration - beforeDur
           slotFilled += filled
+          // 记录该 slot 对应的片段，后续按原始时间顺序重排
+          slotSegmentMap.push({
+            slotIdx: i,
+            videoPath: candidate.videoPath,
+            timeRange: [result.timeRanges[result.timeRanges.length - 1][0], result.timeRanges[result.timeRanges.length - 1][1]],
+          })
           matchLog('SEGMENT_SELECTED', {
             slotIndex: i,
             videoPath: candidate.videoPath,
@@ -541,6 +550,25 @@ export async function matchVideoSegments(
           remaining: targetDuration - currentDuration,
         })
       }
+    }
+
+    // 按原始句子时间顺序重排，确保与音频时间轴一致
+    if (slotSegmentMap.length > 0) {
+      result.videoFiles = []
+      result.timeRanges = []
+      // 按 slotIdx 升序 = 原始时间顺序
+      slotSegmentMap.sort((a, b) => a.slotIdx - b.slotIdx)
+      for (const seg of slotSegmentMap) {
+        result.videoFiles.push(seg.videoPath)
+        result.timeRanges.push(seg.timeRange)
+      }
+      matchLog('SEGMENTS_REORDERED', {
+        orderedSlots: slotSegmentMap.map(s => ({
+          slotIdx: s.slotIdx,
+          videoPath: path.basename(s.videoPath),
+          timeRange: s.timeRange,
+        }))
+      })
     }
 
     if (currentDuration < targetDuration * 1.2) {
