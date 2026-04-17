@@ -282,7 +282,6 @@ function getCurrentAssembledDuration(timeRanges: [string, string][]): number {
 
 function buildTailFillRanked(
   candidates: CandidateClip[],
-  usedRanges: Map<string, Array<[number, number]>>,
 ): number[] {
   return candidates
     .map((candidate, index) => {
@@ -418,7 +417,7 @@ export function assembleSegments(
 
   const targetDuration = totalAudioDuration || stageSentences.reduce((sum, sentence) => sum + (sentence.end - sentence.start), 0)
   let currentDuration = getCurrentAssembledDuration(timeRanges)
-  let tailRanked = buildTailFillRanked(candidates, usedRanges)
+  let tailRanked = buildTailFillRanked(candidates)
 
   while (targetDuration - currentDuration > 0.12 && tailRanked.length > 0) {
     let chosenIndex = null
