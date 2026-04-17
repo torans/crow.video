@@ -1,7 +1,7 @@
 {
   "name": "crow-video",
   "description": "乌鸦视频工厂,全自动生成带货视频，上传商品即出片，支持批量创作日产1000+条，抖店/快手/TikTok卖家必备。",
-  "version": "1.0.0",
+  "version": "1.3.1",
   "author": {
     "name": "兰秋",
     "developer": "兰秋",

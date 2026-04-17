@@ -167,13 +167,17 @@ export async function callLLMMatch(
   const candidateList = buildCandidatePrompt(candidates)
   const sentenceList = buildSentencePrompt(sentences)
 
-  const systemPrompt = `你是一位短视频剪辑导演。必须遵守这个结构：
-1. hook：前3秒必须有动态冲击和强抓眼镜头。
-2. content：展示产品参数、细节、质感或性能价值。
-3. scene：展示真实使用场景/情境代入，而不是问题对比。
+  const systemPrompt = `你是一位短视频剪辑导演。必须严格遵守 Hook → Content → CTA 三段式结构：
+1. hook（黄金3秒）：
+   - 【最高优先级】必须选择动态冲击、特写、爆发力的镜头（如：抛投瞬间、快速动作、视觉冲击画面）。
+   - 【绝对禁止】开头不能用产品参数、静态细节、文字说明类素材。
+   - 如果候选中有 stageHints 包含 "hook" 的素材，必须优先使用。
+2. content（产品价值，占比最大）：展示产品参数、细节、质感或性能价值。
+3. scene：展示真实使用场景/情境代入。
 4. cta：展示成果、产品全貌或收尾转化镜头。
 
 硬约束：
+- hook 阶段的候选排序中，绝不能把 stageHints=["content"] 的素材排在前面。
 - 先保证 stage 匹配，再考虑丰富度。
 - 优先选择 availableDuration 足够覆盖该句时长的候选。
 - 可以推荐多个备选，供剪辑系统做去重和补时长。
@@ -262,9 +266,10 @@ export async function matchVideoSegmentsByLLM(params: {
   subtitleFile: string
   videoAssets: string[]
   productInfo?: ProductInfo
+  targetDuration?: number
   llmConfig: { apiUrl: string; apiKey: string; modelName: string }
 }) {
-  const { subtitleFile, videoAssets, productInfo, llmConfig } = params
+  const { subtitleFile, videoAssets, productInfo, targetDuration, llmConfig } = params
 
   const sentences = classifySentenceStages(parseAssSentences(subtitleFile))
   const baseCandidates = await fetchTopKCandidates(sentences, videoAssets, 80)
@@ -279,19 +284,19 @@ export async function matchVideoSegmentsByLLM(params: {
 
   const candidates = buildStageAwareCandidateList(baseCandidates, videoDurations)
   const llmResult = await callLLMMatch(sentences, candidates, llmConfig, productInfo)
-  const assembled = assembleSegments(sentences, llmResult, candidates, productInfo)
+  const assembled = assembleSegments(sentences, llmResult, candidates, productInfo, targetDuration)
 
   const totalDuration = assembled.timeRanges.reduce(
     (sum, [start, end]) => sum + (Number.parseFloat(end) - Number.parseFloat(start)),
     0,
   )
-  const targetDuration = sentences.reduce(
+  const originalTarget = targetDuration || sentences.reduce(
     (sum, sentence) => sum + (sentence.end - sentence.start),
     0,
   )
 
   console.log(
-    `[llm-match] assembled segments=${assembled.videoFiles.length} total=${totalDuration.toFixed(3)} target=${targetDuration.toFixed(3)}`,
+    `[llm-match] assembled segments=${assembled.videoFiles.length} total=${totalDuration.toFixed(3)} target=${originalTarget.toFixed(3)}`,
   )
 
   return assembled

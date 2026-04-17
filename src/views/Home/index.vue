@@ -196,6 +196,7 @@ const handleRenderVideo = async () => {
         const matched = await window.electron.vlMatchByLLM({
           subtitleFile: ttsResult.subtitlePath,
           videoAssets: JSON.parse(JSON.stringify(appStore.videoAssets)),
+          targetDuration: ttsResult.duration,
           productInfo: appStore.currentProduct
             ? {
                 name: appStore.currentProduct.name,

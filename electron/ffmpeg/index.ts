@@ -56,14 +56,16 @@ export async function renderVideo(
 
     const segmentDuration = getTotalSegmentDuration(params.timeRanges)
     const requestedOutputDuration = params.outputDuration ? Number.parseFloat(params.outputDuration) : null
+    // 关键修正：视频时长必须以音频（语音）时长为准，不能截断音频
+    // 如果片段总时长 < 音频时长，让最后一帧冻结（hold）而不是提前结束
     const effectiveOutputDuration =
       requestedOutputDuration !== null && Number.isFinite(requestedOutputDuration)
-        ? Math.min(requestedOutputDuration, segmentDuration)
+        ? requestedOutputDuration
         : undefined
 
     if (requestedOutputDuration !== null && Number.isFinite(requestedOutputDuration) && segmentDuration + 0.05 < requestedOutputDuration) {
       console.warn(
-        `[ffmpeg] 视频片段总时长不足，避免尾帧冻结：segments=${segmentDuration.toFixed(3)}s requested=${requestedOutputDuration.toFixed(3)}s effective=${effectiveOutputDuration?.toFixed(3)}s`,
+        `[ffmpeg] 视频片段总时长(${segmentDuration.toFixed(3)}s)略短于音频时长(${requestedOutputDuration.toFixed(3)}s)，最后一帧将自动延长`,
       )
     }
 

@@ -60,25 +60,18 @@ function isCtaText(text: string): boolean {
 export function detectSentenceStage(text: string, index: number, total: number): SegmentStage {
   const normalized = text.trim()
 
-  // 前2句默认 hook（除非明确是 cta/scene）
-  if (index <= 2) {
-    if (isCtaText(normalized)) return 'cta'
-    if (isSceneText(normalized)) return 'scene'
-    return 'hook'
-  }
-  if (index === 0 || HOOK_HINTS.some((keyword) => normalized.includes(keyword))) return 'hook'
-  if (isCtaText(normalized)) return 'cta'
+  // 短视频（带货类）必须符合 Hook（黄金 3 秒）+ Content（产品价值）+ CTA（转化引导）
+  
+  // 1. Hook (黄金 3 秒) 一般是第 1 句（甚至前两句）
+  if (index === 0) return 'hook'
+  if (index === 1 && total > 3 && !isCtaText(normalized)) return 'hook'
+
+  // 3. CTA (转化引导) 一般是最后 1 句或带有明显引导词的末尾部分
+  if (index === total - 1) return 'cta'
+  if (index >= total - 3 && isCtaText(normalized)) return 'cta'
+
+  // 2. Content (产品价值) 中间绝大部分内容
   if (isSceneText(normalized)) return 'scene'
-
-  if (index === total - 1) {
-    if (CTA_SOFT_HINTS.some((keyword) => normalized.includes(keyword)) && normalized.length <= 24) {
-      return 'cta'
-    }
-    return 'content'
-  }
-
-  const ratio = total <= 1 ? 0 : index / (total - 1)
-  if (ratio >= 0.7 && total >= 5) return 'scene'
   return 'content'
 }
 
@@ -113,14 +106,17 @@ function getStageMatchScore(sentenceStage: SegmentStage, candidateHints: Segment
   const hasCta = candidateHints.includes('cta')
 
   switch (sentenceStage) {
+    case 'hook':
+      // Hook（黄金3秒）必须强视觉冲击，给予最高优先级
+      if (hasHook) return 80
+      if (hasScene) return 15   // 场景素材可以作为次选
+      if (hasContent) return -40 // 产品细节绝不能做开头
+      return -50
     case 'content':
+      // Content（产品价值）占比最大，优先匹配 content 素材
       if (hasContent) return 55
       if (hasHook || hasScene || hasCta) return -35
       return -10
-    case 'hook':
-      if (hasSameStage) return 45
-      if (hasContent) return 5
-      return -30
     case 'scene':
       if (hasSameStage) return 45
       if (hasContent) return 0
@@ -143,8 +139,9 @@ export function rankCandidatesForSentence(
   candidates: CandidateClip[],
   usedVideos: Set<string>,
   productInfo?: ProductInfo,
+  requiredDuration?: number,
 ): number[] {
-  const sentenceDuration = sentence.end - sentence.start
+  const sentenceDuration = requiredDuration || (sentence.end - sentence.start)
   const keywords = extractKeywords(sentence.text)
   const productKeywords = extractKeywords([
     productInfo?.name || '',
@@ -307,6 +304,7 @@ export function assembleSegments(
   llmResult: RankedSentenceSelection[],
   candidates: CandidateClip[],
   productInfo?: ProductInfo,
+  totalAudioDuration?: number,
 ): { videoFiles: string[]; timeRanges: [string, string][] } {
   const videoFiles: string[] = []
   const timeRanges: [string, string][] = []
@@ -317,9 +315,17 @@ export function assembleSegments(
   )
 
   stageSentences.forEach((sentence, index) => {
-    let remaining = sentence.end - sentence.start
+    const segmentStartTime = index === 0 ? 0 : sentence.start
+    let segmentEndTime = sentence.end
+    if (index < stageSentences.length - 1) {
+      segmentEndTime = stageSentences[index + 1].start
+    } else if (totalAudioDuration && totalAudioDuration > segmentStartTime) {
+      segmentEndTime = totalAudioDuration
+    }
+
+    let remaining = segmentEndTime - segmentStartTime
     const llmRanked = llmResult[index]?.rankedSegmentIndices || []
-    const heuristicRanked = rankCandidatesForSentence(sentence, candidates, usedVideos, productInfo)
+    const heuristicRanked = rankCandidatesForSentence(sentence, candidates, usedVideos, productInfo, remaining)
     let ranked = dedupeIndices([...llmRanked, ...heuristicRanked])
 
     while (remaining > 0.12 && ranked.length > 0) {
@@ -383,13 +389,38 @@ export function assembleSegments(
     }
 
     if (remaining > 0.12) {
-      console.warn(
-        `[assemble] [${index}] stage=${sentence.stage} 未完全补足，remaining=${remaining.toFixed(3)} text=${sentence.text}`,
-      )
+      // 强制重复挑选候选来填补本句剩余时长，无视重叠
+      let forceRanked = [...candidates].sort((a, b) => {
+        const aScore = getStageMatchScore(sentence.stage, inferCandidateStageHints(a)) * 2 + (a.availableDuration || 0)
+        const bScore = getStageMatchScore(sentence.stage, inferCandidateStageHints(b)) * 2 + (b.availableDuration || 0)
+        return bScore - aScore
+      })
+
+      while (remaining > 0.12 && forceRanked.length > 0) {
+        const candidate = forceRanked.shift()!
+        const clipStart = candidate.timestamp
+        const available = candidate.availableDuration || (candidate.videoDur || 15) - clipStart
+        const sliceDuration = Math.min(available, remaining)
+        if (sliceDuration <= 0.05) continue
+
+        const safeEnd = clipStart + sliceDuration
+        
+        const existingRanges = usedRanges.get(candidate.videoPath) || []
+        existingRanges.push([clipStart, safeEnd])
+        usedRanges.set(candidate.videoPath, existingRanges)
+        
+        videoFiles.push(candidate.videoPath)
+        timeRanges.push([clipStart.toFixed(3), safeEnd.toFixed(3)])
+        remaining -= sliceDuration
+
+        console.log(
+          `[assemble-force-fill] [${index}] stage=${sentence.stage} ${path.basename(candidate.videoPath)} remain=${remaining.toFixed(3)} → trim=${clipStart.toFixed(3)}-${safeEnd.toFixed(3)}`,
+        )
+      }
     }
   })
 
-  const targetDuration = stageSentences.reduce((sum, sentence) => sum + (sentence.end - sentence.start), 0)
+  const targetDuration = totalAudioDuration || stageSentences.reduce((sum, sentence) => sum + (sentence.end - sentence.start), 0)
   let currentDuration = getCurrentAssembledDuration(timeRanges)
   let tailRanked = buildTailFillRanked(candidates, usedRanges)
 
@@ -423,9 +454,28 @@ export function assembleSegments(
       }
     }
 
-    if (chosenIndex === null) break
-    // 移除用过的候选
-    tailRanked = tailRanked.filter((idx) => idx !== chosenIndex)
+    if (chosenIndex !== null) {
+      // 移除用过的候选
+      tailRanked = tailRanked.filter((idx) => idx !== chosenIndex)
+    } else {
+      // 找不到任何不重叠片段了，强制无视重叠填满
+      if (candidates.length === 0) break
+
+      const candidate = candidates[Math.floor(random() * candidates.length)]
+      const clipStart = candidate.timestamp
+      const available = candidate.availableDuration || (candidate.videoDur || 15) - clipStart
+      const sliceDuration = Math.min(available, targetDuration - currentDuration)
+      if (sliceDuration <= 0.05) break
+
+      const safeEnd = clipStart + sliceDuration
+      videoFiles.push(candidate.videoPath)
+      timeRanges.push([clipStart.toFixed(3), safeEnd.toFixed(3)])
+      currentDuration += sliceDuration
+
+      console.log(
+        `[assemble-tail-force-fill] ${path.basename(candidate.videoPath)} remain=${(targetDuration - currentDuration).toFixed(3)} → trim=${clipStart.toFixed(3)}-${safeEnd.toFixed(3)}`,
+      )
+    }
   }
 
   return { videoFiles, timeRanges }

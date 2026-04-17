@@ -55,7 +55,18 @@ export function buildRenderVideoArgs(
   })
 
   filters.push(`[${videoStreams.join('][')}]concat=n=${videoFiles.length}:v=1:a=0[vconcat]`)
-  filters.push(`[vconcat]format=yuv420p[vout]`)
+  // 如果视频片段总时长略短于音频，用 tpad 冻结最后一帧来补齐
+  if (outputDuration) {
+    const durSec = Number.parseFloat(outputDuration)
+    if (Number.isFinite(durSec)) {
+      filters.push(`[vconcat]tpad=stop_duration=${Math.ceil(durSec)}:stop_mode=clone[vpadded]`)
+      filters.push(`[vpadded]trim=0:${outputDuration},setpts=PTS-STARTPTS,format=yuv420p[vout]`)
+    } else {
+      filters.push(`[vconcat]format=yuv420p[vout]`)
+    }
+  } else {
+    filters.push(`[vconcat]format=yuv420p[vout]`)
+  }
 
   const hasSubtitle = fs.existsSync(resolvedSubtitlePath)
   if (hasSubtitle) {

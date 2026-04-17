@@ -66,13 +66,6 @@
                     required
                     clearable
                   ></v-text-field>
-                  <v-select
-                    :label="t('features.llm.config.language')"
-                    v-model="config.language"
-                    :items="languageOptions"
-                    item-title="label"
-                    item-value="value"
-                  ></v-select>
                   <small class="text-caption text-medium-emphasis">{{
                     t('features.llm.config.compatibleNote')
                   }}</small>
@@ -198,33 +191,48 @@ const buildSystemPrompt = (productContext?: string): string => {
   if (productContext) return productContext
   const lang = appStore.llmConfig.language || '中文'
   const product = appStore.currentProduct
+  const matchMode = appStore.renderConfig.matchMode || 'product'
 
   const parts: string[] = []
-  parts.push(`你是一个高端渔具品牌的视觉营销专家。`)
-  parts.push(`【核心任务】：撰写一段适配“纯产品展示/高清细节镜头”的短视频口播文案。`)
 
-  // 核心约束：声画同步逻辑
-  parts.push(`\n【视觉匹配准则】：
-1. 禁止负面情绪：素材库全是高清美感画面，文案禁止出现“炸线、烦人、垃圾”等负面词汇。
-2. 显性卖点对齐：文案必须【显性化】描述产品特征，确保剪辑系统能通过文案关键词匹配到特写画面。`)
+  // 1. 核心人设与字数对标
+  parts.push(`你是一个短视频爆款带货编剧，擅长用最狠、最直接的话术实现高转化。`)
+  parts.push(`【硬性要求】：总字数严格控制在 100-150 字之间。不准罗嗦，每句话都要有含金量。`)
 
+  // 2. 严格的黄金三段式结构 (Hook + Content + CTA)
+  parts.push(`\n【脚本结构指令】（严格遵守以下三段式结构，其中Content占比最大）：
+1. **Hook (黄金3秒)**：第1句。必须一句话封喉。要么抛出惊人事实，要么直接展示产品最硬核的瞬间（如：掰不断、划不破、直接砸）。
+2. **Content (产品价值)**：中间大部分（占比需达到70%）。
+   - ${matchMode === 'product' ? '重点描述“显性卖点”：材质、手感、细节。要让观众觉得这东西很贵、很值。' : '重点描述“使用反差”：没用之前多痛苦，用了之后多爽。强化场景带入感。'}
+   - 多用动词（如：拉、拽、弹、磨），禁止用空洞的形容词。
+3. **CTA (转化引导)**：最后1-2句。别废话，直接给行动指令。比如“看左下角”、“库存不多”、“直接带走”。`)
+
+  // 3. 语感模型：反 AI 模板化
+  parts.push(`\n【语感准则】：
+- 拒绝 AI 腔：禁止出现“想象一下”、“在这个世界”、“探索”、“不仅仅...更是”等废话。
+- 【严禁捏造】：绝不能虚构产品参数（如具体的线号、尺寸、重量、材质等），只能基于下方提供的【当前产品数据】进行扩写。如果信息较少，请侧重于使用体验、效果和购买号召。
+- 风格应当像一个经验丰富、爽快直接的带货主播，语速明快，直戳痛点。`)
+
+  // 4. 动态数据注入
   if (product) {
-    parts.push(`\n【必须使用的产品数据】：`)
-    parts.push(`- 产品名称：${product.name}`)
-    if (product.features) parts.push(`- 核心卖点（对应工艺特写）：${product.features}`)
-    if (product.highlights) parts.push(`- 亮点描述（对应效果展示）：${product.highlights}`)
-    if (product.target_audience) parts.push(`- 目标受众：${product.target_audience}`)
-
-    parts.push(`\n【撰写指令】：
-1. 提取上述“核心卖点”和“亮点描述”中的具体词汇编织进文案。
-2. 每一句台词必须对应一个具体的【视觉动作】或【材质细节】。
-3. 开头用“专业降维打击”的方式切入，直接展示产品的高级感。
-4. 风格：沉稳、专业、口语化，字数控制在 100-130 字。`)
-  } else {
-    parts.push(`\n请撰写一段通用的、高质感的渔具带货文案，突出专业感。`)
+    parts.push(`\n【当前产品数据】：`)
+    parts.push(`- 名称：${product.name}`)
+    if (product.features) parts.push(`- 核心工艺：${product.features}`)
+    if (product.highlights) parts.push(`- 使用效果：${product.highlights}`)
+    if (product.target_audience) parts.push(`- 核心人群：${product.target_audience}`)
   }
-
-  parts.push(`\n必须使用${lang}输出。只给正文，不给标题。`)
+  parts.push(`\n【最高优先级语言指令】：
+必须将最终生成的口播文案翻译并完全输出为【${lang}】。不管下方提供的产品信息是什么语言，不管上文的结构指令是什么语言，最后输出的成稿必须 100% 使用纯正地道的【${lang}】！`)
+  parts.push(`\n规避极限词。比如极细、最强、第一、顶级等等`)
+  // 5. 输出格式
+  parts.push(
+    `\n【绝对强制的输出格式】：
+- 这是一个要直接喂给语音合成（TTS）的口播稿，必须是**完全纯文本**。
+- 不做任何结构化拆分！不准分点，不准写开头语，不准写类似“Hook:”、“Content:”或“【PE线】”这样的结构化标签。
+- 严禁使用任何 Markdown 符号（如 \`**\`、\`*\`、\`#\`、\`-\`）。
+- 严禁使用换行符分成多段，必须是连贯、自然融合的一整段话。
+- 再次强调：输出的内容要能直接拿去愉快地朗读，请返回总字数严格保持在 100-150 字以内。`,
+  )
 
   return parts.join('\n')
 }
