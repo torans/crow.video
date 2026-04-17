@@ -45,9 +45,7 @@ const STAGE_KEYWORDS: Record<SegmentStage, string[]> = {
 }
 
 const CTA_HINTS = ['下单', '入手', '安排', '闭眼冲', '试试', '带走', '现在', '备一卷', '带上', '上链接']
-const CTA_SOFT_HINTS = ['值得带', '收好', '备着', '搞一盘']
 const SCENE_HINTS = ['野钓', '路亚', '户外', '水面', '岸边', '实战', '使用', '场景', '作钓', '上手', '出门']
-const HOOK_HINTS = ['还在', '别再', '一开口', '先说', '直接', '上来', '抛不远', '你知道吗', '第一句']
 
 function isSceneText(text: string): boolean {
   return SCENE_HINTS.some((keyword) => text.includes(keyword))
@@ -288,8 +286,6 @@ function buildTailFillRanked(
 ): number[] {
   return candidates
     .map((candidate, index) => {
-      const existingRanges = usedRanges.get(candidate.videoPath) || []
-      const clipEnd = candidate.timestamp + (candidate.availableDuration || 0)
       // tail-fill 阶段：重叠的片段也保留（允许复用同一视频的不同时间位置）
       let score = candidate.availableDuration || 0
       return { index, score }

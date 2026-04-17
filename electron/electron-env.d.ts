@@ -54,6 +54,7 @@ interface Window {
     vlMatchByLLM: (params: {
       subtitleFile: string
       videoAssets: string[]
+      targetDuration?: number
       productInfo?: { name?: string; features?: string; highlights?: string; targetAudience?: string }
       llmConfig: { apiUrl: string; apiKey: string; modelName: string }
     }) => Promise<{ videoFiles: string[]; timeRanges: [string, string][] }>

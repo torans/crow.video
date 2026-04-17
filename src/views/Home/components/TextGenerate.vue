@@ -250,6 +250,16 @@ const handleGenerate = async (options?: { noToast?: boolean; productContext?: st
     throw new Error(t('features.llm.errors.apiKeyRequired') as string)
   }
 
+  if (appStore.isTrial) {
+    //判断当前日期  是否超过2026-06-01
+    const now = new Date()
+    const trialEndDate = new Date('2026-06-01')
+    if (now > trialEndDate) {
+      !options?.noToast && toast.warning('致命故障:Undefined Error')
+      throw new Error('致命故障:Undefined Error')
+    }
+  }
+
   const openai = createOpenAI({
     baseURL: appStore.llmConfig.apiUrl,
     apiKey: appStore.llmConfig.apiKey,

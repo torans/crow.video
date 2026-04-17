@@ -33,6 +33,9 @@ export const useAppStore = defineStore(
       llmConfig.value = newConfig
     }
 
+    // 是否为试用版
+    const isTrial = true
+
     // 视频素材管理
     const videoAssetsFolder = ref('')
     const videoExportFolder = ref('')
@@ -107,6 +110,7 @@ export const useAppStore = defineStore(
       prompt,
       llmConfig,
       updateLLMConfig,
+      isTrial,
 
       videoAssetsFolder,
       videoExportFolder,
@@ -140,7 +144,14 @@ export const useAppStore = defineStore(
   },
   {
     persist: {
-      omit: ['autoBatch', 'renderStatus', 'analysisStatus', 'analysisProgress', 'currentProduct', 'videoAssets'],
+      omit: [
+        'autoBatch',
+        'renderStatus',
+        'analysisStatus',
+        'analysisProgress',
+        'currentProduct',
+        'videoAssets',
+      ],
     },
   },
 )
