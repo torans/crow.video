@@ -44,8 +44,31 @@ const STAGE_KEYWORDS: Record<SegmentStage, string[]> = {
   cta: ['展示', '成果', '收获', '上鱼', '大鱼', '成就', '入手', '闭眼冲', '安排', '带回去'],
 }
 
-const CTA_HINTS = ['下单', '入手', '安排', '闭眼冲', '试试', '带走', '现在', '备一卷', '带上', '上链接']
-const SCENE_HINTS = ['野钓', '路亚', '户外', '水面', '岸边', '实战', '使用', '场景', '作钓', '上手', '出门']
+const CTA_HINTS = [
+  '下单',
+  '入手',
+  '安排',
+  '闭眼冲',
+  '试试',
+  '带走',
+  '现在',
+  '备一卷',
+  '带上',
+  '上链接',
+]
+const SCENE_HINTS = [
+  '野钓',
+  '路亚',
+  '户外',
+  '水面',
+  '岸边',
+  '实战',
+  '使用',
+  '场景',
+  '作钓',
+  '上手',
+  '出门',
+]
 
 function isSceneText(text: string): boolean {
   return SCENE_HINTS.some((keyword) => text.includes(keyword))
@@ -59,7 +82,7 @@ export function detectSentenceStage(text: string, index: number, total: number):
   const normalized = text.trim()
 
   // 短视频（带货类）必须符合 Hook（黄金 3 秒）+ Content（产品价值）+ CTA（转化引导）
-  
+
   // 1. Hook (黄金 3 秒) 一般是第 1 句（甚至前两句）
   if (index === 0) return 'hook'
   if (index === 1 && total > 3 && !isCtaText(normalized)) return 'hook'
@@ -96,6 +119,7 @@ export function inferCandidateStageHints(candidate: CandidateClip): SegmentStage
   return [...hints]
 }
 
+// 匹配分值
 function getStageMatchScore(sentenceStage: SegmentStage, candidateHints: SegmentStage[]): number {
   const hasSameStage = candidateHints.includes(sentenceStage)
   const hasContent = candidateHints.includes('content')
@@ -107,7 +131,7 @@ function getStageMatchScore(sentenceStage: SegmentStage, candidateHints: Segment
     case 'hook':
       // Hook（黄金3秒）必须强视觉冲击，给予最高优先级
       if (hasHook) return 80
-      if (hasScene) return 15   // 场景素材可以作为次选
+      if (hasScene) return 15 // 场景素材可以作为次选
       if (hasContent) return -40 // 产品细节绝不能做开头
       return -50
     case 'content':
@@ -139,13 +163,11 @@ export function rankCandidatesForSentence(
   productInfo?: ProductInfo,
   requiredDuration?: number,
 ): number[] {
-  const sentenceDuration = requiredDuration || (sentence.end - sentence.start)
+  const sentenceDuration = requiredDuration || sentence.end - sentence.start
   const keywords = extractKeywords(sentence.text)
-  const productKeywords = extractKeywords([
-    productInfo?.name || '',
-    productInfo?.features || '',
-    productInfo?.highlights || '',
-  ].join(' '))
+  const productKeywords = extractKeywords(
+    [productInfo?.name || '', productInfo?.features || '', productInfo?.highlights || ''].join(' '),
+  )
 
   return candidates
     .map((candidate, index) => {
@@ -280,9 +302,7 @@ function getCurrentAssembledDuration(timeRanges: [string, string][]): number {
   )
 }
 
-function buildTailFillRanked(
-  candidates: CandidateClip[],
-): number[] {
+function buildTailFillRanked(candidates: CandidateClip[]): number[] {
   return candidates
     .map((candidate, index) => {
       // tail-fill 阶段：重叠的片段也保留（允许复用同一视频的不同时间位置）
@@ -320,7 +340,13 @@ export function assembleSegments(
 
     let remaining = segmentEndTime - segmentStartTime
     const llmRanked = llmResult[index]?.rankedSegmentIndices || []
-    const heuristicRanked = rankCandidatesForSentence(sentence, candidates, usedVideos, productInfo, remaining)
+    const heuristicRanked = rankCandidatesForSentence(
+      sentence,
+      candidates,
+      usedVideos,
+      productInfo,
+      remaining,
+    )
     let ranked = dedupeIndices([...llmRanked, ...heuristicRanked])
 
     while (remaining > 0.12 && ranked.length > 0) {
@@ -386,8 +412,12 @@ export function assembleSegments(
     if (remaining > 0.12) {
       // 强制重复挑选候选来填补本句剩余时长，无视重叠
       let forceRanked = [...candidates].sort((a, b) => {
-        const aScore = getStageMatchScore(sentence.stage, inferCandidateStageHints(a)) * 2 + (a.availableDuration || 0)
-        const bScore = getStageMatchScore(sentence.stage, inferCandidateStageHints(b)) * 2 + (b.availableDuration || 0)
+        const aScore =
+          getStageMatchScore(sentence.stage, inferCandidateStageHints(a)) * 2 +
+          (a.availableDuration || 0)
+        const bScore =
+          getStageMatchScore(sentence.stage, inferCandidateStageHints(b)) * 2 +
+          (b.availableDuration || 0)
         return bScore - aScore
       })
 
@@ -399,11 +429,11 @@ export function assembleSegments(
         if (sliceDuration <= 0.05) continue
 
         const safeEnd = clipStart + sliceDuration
-        
+
         const existingRanges = usedRanges.get(candidate.videoPath) || []
         existingRanges.push([clipStart, safeEnd])
         usedRanges.set(candidate.videoPath, existingRanges)
-        
+
         videoFiles.push(candidate.videoPath)
         timeRanges.push([clipStart.toFixed(3), safeEnd.toFixed(3)])
         remaining -= sliceDuration
@@ -415,7 +445,9 @@ export function assembleSegments(
     }
   })
 
-  const targetDuration = totalAudioDuration || stageSentences.reduce((sum, sentence) => sum + (sentence.end - sentence.start), 0)
+  const targetDuration =
+    totalAudioDuration ||
+    stageSentences.reduce((sum, sentence) => sum + (sentence.end - sentence.start), 0)
   let currentDuration = getCurrentAssembledDuration(timeRanges)
   let tailRanked = buildTailFillRanked(candidates)
 
@@ -429,7 +461,12 @@ export function assembleSegments(
       const clipStart = candidate.timestamp
       const clipEnd = Math.min(videoDur, clipStart + (candidate.availableDuration || 0))
       const existingRanges = usedRanges.get(candidate.videoPath) || []
-      const window = findAvailableWindow(existingRanges, clipStart, clipEnd, targetDuration - currentDuration)
+      const window = findAvailableWindow(
+        existingRanges,
+        clipStart,
+        clipEnd,
+        targetDuration - currentDuration,
+      )
       if (window) {
         chosenIndex = idx
         const [trimStart, safeEnd] = window
