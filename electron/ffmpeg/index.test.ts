@@ -47,24 +47,30 @@ test('getTotalSegmentDuration sums valid time ranges only', () => {
 
 test('buildRenderVideoArgs normalizes Windows subtitle paths for ffmpeg filters', (t) => {
   const windowsSubtitlePath = 'C:\\Users\\Administrator\\AppData\\Local\\Temp\\crow-video\\temp-tts-voice-1776748899323.ass'
-  t.mock.method(fs, 'existsSync', (path: fs.PathLike) => path === windowsSubtitlePath)
+  const originalExistsSync = fs.existsSync
 
-  const { args } = buildRenderVideoArgs({
-    videoFiles: ['D:/assets/a.mp4'],
-    timeRanges: [['0', '1']],
-    audioFiles: { voice: 'C:/temp/voice.mp3' },
-    subtitleFile: windowsSubtitlePath,
-    outputSize: { width: 1080, height: 1920 },
-    outputPath: 'C:/temp/out.mp4',
-    outputDuration: '1',
-    resolvedVoicePath: 'C:/temp/voice.mp3',
-    resolvedSubtitlePath: windowsSubtitlePath,
-  })
+  fs.existsSync = ((path: fs.PathLike) => path === windowsSubtitlePath) as typeof fs.existsSync
 
-  const filter = args[args.indexOf('-filter_complex') + 1]
+  try {
+    const { args } = buildRenderVideoArgs({
+      videoFiles: ['D:/assets/a.mp4'],
+      timeRanges: [['0', '1']],
+      audioFiles: { voice: 'C:/temp/voice.mp3' },
+      subtitleFile: windowsSubtitlePath,
+      outputSize: { width: 1080, height: 1920 },
+      outputPath: 'C:/temp/out.mp4',
+      outputDuration: '1',
+      resolvedVoicePath: 'C:/temp/voice.mp3',
+      resolvedSubtitlePath: windowsSubtitlePath,
+    })
 
-  assert.match(
-    filter,
-    /\[vout\]subtitles='C\\:\/Users\/Administrator\/AppData\/Local\/Temp\/crow-video\/temp-tts-voice-1776748899323\.ass'\[with_subs\]/,
-  )
+    const filter = args[args.indexOf('-filter_complex') + 1]
+
+    assert.match(
+      filter,
+      /\[vout\]subtitles='C\\:\/Users\/Administrator\/AppData\/Local\/Temp\/crow-video\/temp-tts-voice-1776748899323\.ass'\[with_subs\]/,
+    )
+  } finally {
+    fs.existsSync = originalExistsSync
+  }
 })
