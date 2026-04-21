@@ -45,7 +45,7 @@ test('getTotalSegmentDuration sums valid time ranges only', () => {
   )
 })
 
-test('buildRenderVideoArgs normalizes Windows subtitle paths for ffmpeg filters', (t) => {
+test('buildRenderVideoArgs normalizes Windows subtitle paths for ffmpeg filters', () => {
   const windowsSubtitlePath = 'C:\\Users\\Administrator\\AppData\\Local\\Temp\\crow-video\\temp-tts-voice-1776748899323.ass'
   const originalExistsSync = fs.existsSync
 
