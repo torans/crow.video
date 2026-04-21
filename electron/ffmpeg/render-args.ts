@@ -3,6 +3,13 @@ import type { RenderVideoParams } from './types.ts'
 
 export const DEFAULT_OUTPUT_FPS = 30
 
+export function escapeSubtitleFilterPath(filePath: string): string {
+  return filePath
+    .replace(/\\/g, '/')
+    .replace(/:/g, '\\:')
+    .replace(/'/g, "\\'")
+}
+
 export function getTotalSegmentDuration(timeRanges: [string, string][]): number {
   return timeRanges.reduce((sum, [start, end]) => {
     const s = Number.parseFloat(start)
@@ -70,7 +77,7 @@ export function buildRenderVideoArgs(
 
   const hasSubtitle = fs.existsSync(resolvedSubtitlePath)
   if (hasSubtitle) {
-    filters.push(`[vout]subtitles=${resolvedSubtitlePath.replace(/\:/g, '\\\\:')}[with_subs]`)
+    filters.push(`[vout]subtitles='${escapeSubtitleFilterPath(resolvedSubtitlePath)}'[with_subs]`)
   }
 
   const voiceStreamIdx = videoFiles.length
