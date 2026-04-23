@@ -176,15 +176,13 @@ defineProps<{
 
 const languageOptions = [
   { label: '中文', value: '中文' },
-  { label: 'English', value: 'English' },
-  { label: '日本語', value: '日本語' },
-  { label: '한국어', value: '한국어' },
-  { label: 'Español', value: 'Español' },
-  { label: 'Français', value: 'Français' },
-  { label: 'Deutsch', value: 'Deutsch' },
-  { label: 'Português', value: 'Português' },
-  { label: 'ภาษาไทย', value: 'ภาษาไทย' },
-  { label: 'Tiếng Việt', value: 'Tiếng Việt' },
+  { label: '英文', value: 'English' },
+  { label: '日文', value: '日本語' },
+  { label: '韩文', value: '한국어' },
+  { label: '泰语', value: 'ภาษาไทย' },
+  { label: '越南语', value: 'Tiếng Việt' },
+  { label: '马来语', value: 'Malay' },
+  { label: '德语', value: 'Deutsch' }
 ]
 
 const buildSystemPrompt = (productContext?: string): string => {

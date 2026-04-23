@@ -133,70 +133,76 @@
         </v-dialog>
       </div>
 
-      <div class="render-panel__content">
-        <div class="render-panel__stage workbench-editor-surface">
-          <v-progress-circular
-            color="primary"
-            v-model="renderProgress"
-            :indeterminate="taskInProgress && appStore.renderStatus !== RenderStatus.Rendering"
-            :size="64"
-            :width="4"
-          />
-          <div class="render-panel__stage-info">
-            <v-chip :color="statusChipColor" variant="tonal" size="large">
+      <div class="render-panel__content workbench-editor-surface">
+        <div class="render-panel__status-row">
+          <div class="render-panel__status-copy">
+            <v-chip :color="statusChipColor" variant="tonal" size="small">
               {{ statusLabel }}
             </v-chip>
-            <v-btn
-              v-if="!taskInProgress"
-              size="x-large"
-              color="primary"
-              block
-              prepend-icon="mdi-play"
-              @click="emit('renderVideo')"
-            >
-              {{ t('features.render.config.startLabel') }}
-            </v-btn>
-            <v-btn
-              v-else
-              color="error"
-              size="x-large"
-              block
-              prepend-icon="mdi-stop"
-              @click="emit('cancelRender')"
-            >
-              {{ t('features.render.config.stopLabel') }}
-            </v-btn>
             <div class="render-panel__hint">
               {{ taskInProgress ? workspaceText('runningHint') : workspaceText('idleHint') }}
             </div>
           </div>
+          <div class="render-panel__progress">
+            <v-progress-circular
+              color="primary"
+              v-model="renderProgress"
+              :indeterminate="taskInProgress && appStore.renderStatus !== RenderStatus.Rendering"
+              :size="42"
+              :width="4"
+            />
+          </div>
         </div>
 
-        <div class="render-panel__actions">
-          <v-switch
-            v-model="appStore.renderConfig.llmSyncEnabled"
-            :label="t('features.render.config.llmSyncEnabled')"
-            density="compact"
-            hide-details
-            :disabled="taskInProgress"
-          />
-          <v-switch
-            v-model="appStore.autoBatch"
-            :label="t('features.render.config.autoBatch')"
-            density="compact"
-            hide-details
-            :disabled="taskInProgress"
-          />
+        <div class="render-panel__controls-row">
+          <v-btn
+            v-if="!taskInProgress"
+            size="large"
+            color="primary"
+            class="render-panel__primary-btn"
+            prepend-icon="mdi-play"
+            @click="emit('renderVideo')"
+          >
+            {{ t('features.render.config.startLabel') }}
+          </v-btn>
+          <v-btn
+            v-else
+            color="error"
+            size="large"
+            class="render-panel__primary-btn"
+            prepend-icon="mdi-stop"
+            @click="emit('cancelRender')"
+          >
+            {{ t('features.render.config.stopLabel') }}
+          </v-btn>
         </div>
-      </div>
-      <div class="render-panel__footer">
-        <span
-          class="text-[12px] cursor-pointer select-none"
-          style="color: var(--apple-text-tertiary)"
-          @click="handleOpenHomePage"
-        >
-          {{ t('footer.poweredBy') }}
-        </span>
+
+        <div class="render-panel__toggles">
+          <div class="render-panel__toggle-item">
+            <div class="render-panel__toggle-copy">
+              <div class="render-panel__toggle-title">{{ t('features.render.config.llmSyncEnabled') }}</div>
+            </div>
+            <v-switch
+              v-model="appStore.renderConfig.llmSyncEnabled"
+              density="compact"
+              hide-details
+              inset
+              :disabled="taskInProgress"
+            />
+          </div>
+          <div class="render-panel__toggle-item">
+            <div class="render-panel__toggle-copy">
+              <div class="render-panel__toggle-title">{{ t('features.render.config.autoBatch') }}</div>
+            </div>
+            <v-switch
+              v-model="appStore.autoBatch"
+              density="compact"
+              hide-details
+              inset
+              :disabled="taskInProgress"
+            />
+          </div>
+        </div>
       </div>
     </v-sheet>
   </div>
@@ -316,26 +322,22 @@ const handleSelectBgmFolder = async () => {
   }
 }
 
-const handleOpenHomePage = () => {
-  window.electron.openExternal({ url: 'https://crow.video' })
-}
 </script>
 
 <style lang="scss" scoped>
 .render-panel-wrap {
   min-height: 0;
-  // flex: 1;
-  // display: flex;
-  // flex-direction: column;
+  height: 100%;
 }
 
 .render-panel {
   flex: 1;
-  min-height: 100%;
-  padding: 20px;
+  min-height: 0;
+  height: 100%;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
   overflow: hidden;
 }
 
@@ -345,7 +347,7 @@ const handleOpenHomePage = () => {
   display: flex;
   align-items: flex-start;
   gap: 12px;
-  padding-right: 100px;
+  padding-right: 88px;
 }
 
 .render-panel__identity {
@@ -375,54 +377,75 @@ const handleOpenHomePage = () => {
 }
 
 .render-panel__content {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
+  gap: 10px;
+  padding: 12px;
 }
 
-.render-panel__stage {
-  flex: 0 0 auto;
-  margin-top: 12px;
-  padding: 30px 20px;
+.render-panel__status-row {
   display: flex;
-  flex-direction: column;
   align-items: center;
-  justify-content: center;
-  gap: 16px;
-  background:
-    radial-gradient(circle at top, rgba(92, 86, 234, 0.08), transparent 34%),
-    linear-gradient(180deg, rgba(255, 251, 247, 0.95), rgba(248, 243, 236, 0.92));
+  justify-content: space-between;
+  gap: 12px;
 }
 
-.render-panel__stage-info {
+.render-panel__status-copy {
   display: flex;
   flex-direction: column;
   gap: 8px;
+  min-width: 0;
+}
+
+.render-panel__progress {
+  flex: 0 0 auto;
+}
+
+.render-panel__controls-row {
+  display: flex;
   align-items: center;
+}
+
+.render-panel__primary-btn {
+  width: 100%;
+  min-height: 46px;
 }
 
 .render-panel__hint {
   font-size: 12px;
   color: var(--workbench-text-soft);
-  text-align: center;
   line-height: 1.45;
-  max-width: 200px;
 }
 
-.render-panel__actions {
+.render-panel__toggles {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 10px;
+}
+
+.render-panel__toggle-item {
+  min-width: 0;
+  padding: 10px 12px;
+  border-radius: 14px;
+  background: rgba(255, 255, 255, 0.72);
+  border: 1px solid rgba(96, 72, 41, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
-  flex-shrink: 0;
+  gap: 10px;
 }
 
-.render-panel__footer {
-  flex-shrink: 0;
-  padding-top: 4px;
-  display: flex;
-  justify-content: center;
+.render-panel__toggle-copy {
+  min-width: 0;
 }
+
+.render-panel__toggle-title {
+  font-size: 13px;
+  line-height: 1.3;
+  color: var(--workbench-text);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 </style>

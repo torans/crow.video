@@ -1,79 +1,25 @@
 <template>
-  <div class="tts-control h-full">
+  <div class="tts-control">
     <v-form :disabled="disabled">
-      <v-sheet class="tts-panel h-full">
+      <v-sheet class="tts-panel">
         <div class="workbench-section-header tts-panel__header">
           <div class="tts-panel__identity">
             <div class="workbench-section-title">{{ workspaceText('title') }}</div>
           </div>
-          <v-dialog v-model="configDialogShow" max-width="500" persistent>
-            <template v-slot:activator="{ props: activatorProps }">
-              <v-btn v-bind="activatorProps" :disabled="disabled" variant="tonal">
-                {{ t('common.buttons.config') }}
-              </v-btn>
-            </template>
-            <v-card prepend-icon="mdi-microphone-settings" :title="t('common.buttons.config')">
-              <v-card-text>
-                <v-combobox
-                  v-model="appStore.language"
-                  density="compact"
-                  :label="t('features.tts.config.language')"
-                  :items="languageItems"
-                  :no-data-text="t('common.states.noData')"
-                  @update:model-value="clearVoice"
-                ></v-combobox>
-                <v-select
-                  v-model="appStore.gender"
-                  density="compact"
-                  :label="t('features.tts.config.gender')"
-                  :items="genderItems"
-                  item-title="label"
-                  item-value="value"
-                  @update:model-value="clearVoice"
-                ></v-select>
-                <v-select
-                  v-model="appStore.voice"
-                  density="compact"
-                  :label="t('features.tts.config.voice')"
-                  :items="filteredVoicesList"
-                  item-title="FriendlyName"
-                  return-object
-                  :no-data-text="t('features.tts.config.selectLanguageGenderFirst')"
-                ></v-select>
-                <v-select
-                  v-model="appStore.speed"
-                  density="compact"
-                  :label="t('features.tts.config.speed')"
-                  :items="speedItems"
-                  item-title="label"
-                  item-value="value"
-                ></v-select>
-              </v-card-text>
-              <v-divider></v-divider>
-              <v-card-actions>
-                <v-spacer></v-spacer>
-                <v-btn
-                  :text="t('common.buttons.close')"
-                  variant="plain"
-                  @click="configDialogShow = false"
-                ></v-btn>
-              </v-card-actions>
-            </v-card>
-          </v-dialog>
+          <v-btn
+            variant="tonal"
+            size="small"
+            prepend-icon="mdi-cog-outline"
+            @click="configDialogOpen = true"
+          >
+            {{ t('common.buttons.config') }}
+          </v-btn>
         </div>
 
         <div class="tts-panel__body">
-          <div class="tts-panel__grid">
-            <v-select
-              v-model="appStore.voice"
-              :label="t('features.tts.config.voice')"
-              :items="filteredVoicesList"
-              item-title="FriendlyName"
-              return-object
-              density="compact"
-              :no-data-text="t('features.tts.config.selectLanguageGenderFirst')"
-            ></v-select>
-          </div>
+          <ElevenLabsTtsPanel
+            @language-change="handleElevenlabsLanguageChange"
+          />
 
           <div class="tts-panel__listen workbench-editor-surface">
             <v-text-field
@@ -96,6 +42,54 @@
         </div>
       </v-sheet>
     </v-form>
+
+    <v-dialog v-model="configDialogOpen" max-width="720">
+      <v-card class="tts-config-dialog" :title="t('features.tts.config.elevenlabsConfigTitle')">
+        <v-card-text class="tts-config-dialog__body">
+          <v-text-field
+            v-model="appStore.ttsConfig.elevenlabsApiKey"
+            density="comfortable"
+            :label="t('features.tts.config.apiKey')"
+            type="password"
+            prepend-inner-icon="mdi-key-variant"
+            @update:model-value="handleElevenlabsApiKeyChange"
+          ></v-text-field>
+
+          <div class="tts-config-dialog__section-title">
+            {{ t('features.tts.config.model') }}
+          </div>
+          <div class="tts-model-list">
+            <button
+              v-for="model in modelItems"
+              :key="model.value"
+              type="button"
+              class="tts-model-card"
+              :class="{ 'tts-model-card--selected': appStore.ttsConfig.elevenlabsModelId === model.value }"
+              @click="appStore.ttsConfig.elevenlabsModelId = model.value"
+            >
+              <div class="tts-model-card__top">
+                <div class="tts-model-card__title-row">
+                  <div class="tts-model-card__title">{{ model.label }}</div>
+                  <span v-if="model.badge" class="tts-model-card__badge">{{ model.badge }}</span>
+                </div>
+                <v-icon
+                  :icon="appStore.ttsConfig.elevenlabsModelId === model.value ? 'mdi-check-circle-outline' : 'mdi-radiobox-blank'"
+                  size="22"
+                ></v-icon>
+              </div>
+              <div class="tts-model-card__desc">{{ model.description }}</div>
+              <div class="tts-model-card__chips">
+                <span v-for="tag in model.tags" :key="tag" class="tts-model-card__chip">{{ tag }}</span>
+              </div>
+            </button>
+          </div>
+          <div class="tts-config-dialog__actions">
+            <v-spacer></v-spacer>
+            <v-btn variant="text" @click="configDialogOpen = false">{{ t('common.buttons.close') }}</v-btn>
+          </div>
+        </v-card-text>
+      </v-card>
+    </v-dialog>
   </div>
 </template>
 
@@ -106,6 +100,7 @@ import { useToast } from 'vue-toastification'
 import { useTranslation } from 'i18next-vue'
 import ActionToastEmbed from '@/components/ActionToastEmbed.vue'
 import { formatErrorForCopy } from '@/lib/error-copy'
+import ElevenLabsTtsPanel from '@/components/tts/ElevenLabsTtsPanel.vue'
 
 const toast = useToast()
 const appStore = useAppStore()
@@ -127,8 +122,36 @@ defineProps<{
   disabled?: boolean
 }>()
 
+const modelItems = computed(() => [
+  {
+    label: 'Eleven v3',
+    value: 'eleven_v3',
+    badge: '',
+    description: t('features.tts.config.modelElevenV3Desc'),
+    tags: ['70+ 语言', '表现力强', '更适合精细调优'],
+  },
+  {
+    label: 'Eleven Multilingual v2',
+    value: 'eleven_multilingual_v2',
+    badge: t('features.tts.config.modelBadgeStudio'),
+    description: t('features.tts.config.modelMultilingualV2Desc'),
+    tags: ['中文', '日语', '英文'],
+  },
+  {
+    label: 'Eleven Flash v2.5',
+    value: 'eleven_flash_v2_5',
+    badge: t('features.tts.config.modelBadgeFast'),
+    description: t('features.tts.config.modelFlashDesc'),
+    tags: ['低延迟', '对话场景', '中文'],
+  },
+])
+
 const configValid = () => {
-  if (!appStore.voice) {
+  if (!appStore.ttsConfig.elevenlabsApiKey) {
+    toast.warning(t('features.tts.errors.apiKeyRequired'))
+    return false
+  }
+  if (!appStore.ttsConfig.elevenlabsVoiceId) {
     toast.warning(t('features.tts.config.selectVoiceWarning'))
     return false
   }
@@ -140,93 +163,27 @@ const configValid = () => {
 }
 
 const tryListeningLoading = ref(false)
+const configDialogOpen = ref(false)
 let currentAudio: HTMLAudioElement | null = null
-const handleTryListening = async () => {
-  if (!configValid()) return
 
-  if (currentAudio) {
-    currentAudio.pause()
-    currentAudio.currentTime = 0
-    currentAudio = null
-  }
-
-  tryListeningLoading.value = true
-  try {
-    const speech = await window.electron.edgeTtsSynthesizeToBase64({
-      text: appStore.tryListeningText,
-      voice: appStore.voice!.ShortName,
-      options: {
-        rate: appStore.speed,
-      },
-    })
-    currentAudio = new Audio(`data:audio/mp3;base64,${speech}`)
-    currentAudio.play()
-    toast.info(t('features.tts.info.playTryAudio'))
-  } catch (error: any) {
-    console.log('试听语音合成失败', error)
-    const errorMessage = error?.error?.message || error?.message || error
-    toast.error({
-      component: {
-        render: () =>
-          h(ActionToastEmbed, {
-            message: t('features.tts.errors.trySynthesisNetwork'),
-            detail: String(errorMessage),
-            actionText: t('common.buttons.copyErrorDetail'),
-            onActionTirgger: () => {
-              navigator.clipboard.writeText(
-                formatErrorForCopy(
-                  t('features.tts.errors.trySynthesisNetwork'),
-                  String(errorMessage),
-                ),
-              )
-              toast.success(t('common.messages.success.copySuccess'))
-            },
-          }),
-      },
-    })
-  } finally {
-    tryListeningLoading.value = false
+const handleElevenlabsApiKeyChange = async () => {
+  appStore.ttsConfig.elevenlabsApiKey = appStore.ttsConfig.elevenlabsApiKey.trim()
+  if (appStore.ttsConfig.elevenlabsApiKey) {
+    await window.electron.elevenlabsTtsSetApiKey({ apiKey: appStore.ttsConfig.elevenlabsApiKey })
+    await fetchElevenlabsVoices()
   }
 }
 
-const clearVoice = () => {
-  appStore.voice = null
-}
+const fetchElevenlabsVoices = async () => {
+  if (!appStore.ttsConfig.elevenlabsApiKey) return
 
-const filteredVoicesList = computed(() => {
-  if (!appStore.language || !appStore.gender) return []
-  return appStore.originalVoicesList.filter(
-    (v: any) =>
-      v.FriendlyName.includes(appStore.language!) && v.Gender === appStore.gender,
-  )
-})
-
-const genderItems = computed(() => [
-  { label: t('features.tts.config.genderFemale'), value: 'Female' },
-  { label: t('features.tts.config.genderMale'), value: 'Male' },
-])
-
-const languageItems = computed(() => {
-  const locales = new Set<string>()
-  for (const v of appStore.originalVoicesList) {
-    const lang = v.Locale.replace(/-[A-Z]{2}$/, '')
-    locales.add(lang)
-  }
-  return [...locales].sort()
-})
-
-const speedItems = computed(() => [
-  { label: t('features.tts.config.speedSlow'), value: -30 },
-  { label: t('features.tts.config.speedMedium'), value: 0 },
-  { label: t('features.tts.config.speedFast'), value: 30 },
-])
-
-const fetchVoices = async () => {
   try {
-    appStore.originalVoicesList = await window.electron.edgeTtsGetVoiceList()
-    console.log('EdgeTTS语音列表获取成功:', appStore.originalVoicesList.length, '个')
+    await window.electron.elevenlabsTtsSetApiKey({ apiKey: appStore.ttsConfig.elevenlabsApiKey })
+    const result = await window.electron.elevenlabsTtsGetVoiceList({ pageSize: 50 })
+    appStore.elevenlabsVoicesList = result.voices
+    console.log('ElevenLabs语音列表获取成功:', appStore.elevenlabsVoicesList.length, '个')
   } catch (error: any) {
-    console.log('获取EdgeTTS语音列表失败', error)
+    console.log('获取ElevenLabs语音列表失败', error)
     const errorMessage = error?.error?.message || error?.message || error
     toast.error({
       component: {
@@ -250,10 +207,67 @@ const fetchVoices = async () => {
   }
 }
 
+const handleElevenlabsLanguageChange = async (_language: string) => {
+  // Language-based voice reloading is handled by ElevenLabsTtsPanel
+}
+
+const handleTryListening = async () => {
+  if (!configValid()) return
+
+  if (currentAudio) {
+    currentAudio.pause()
+    currentAudio.currentTime = 0
+    currentAudio = null
+  }
+
+  tryListeningLoading.value = true
+  try {
+    const speech = await window.electron.elevenlabsTtsSynthesizeToBase64({
+      text: appStore.tryListeningText,
+      voiceId: appStore.ttsConfig.elevenlabsVoiceId,
+      options: {
+        speed: appStore.ttsConfig.elevenlabsSpeed,
+        modelId: appStore.ttsConfig.elevenlabsModelId,
+      },
+    })
+    currentAudio = new Audio(`data:audio/mp3;base64,${speech}`)
+    currentAudio.play()
+    toast.info(t('features.tts.info.playTryAudio'))
+  } catch (error: any) {
+    console.log('试听语音合成失败', error)
+    const errorMessage = error?.error?.message || error?.message || error
+    const isPaymentError = String(errorMessage).includes('402')
+    toast.error({
+      component: {
+        render: () =>
+          h(ActionToastEmbed, {
+            message: isPaymentError
+              ? t('features.tts.errors.subscriptionRequired')
+              : t('features.tts.errors.trySynthesisNetwork'),
+            detail: String(errorMessage),
+            actionText: t('common.buttons.copyErrorDetail'),
+            onActionTirgger: () => {
+              navigator.clipboard.writeText(
+                formatErrorForCopy(
+                  isPaymentError
+                    ? t('features.tts.errors.subscriptionRequired')
+                    : t('features.tts.errors.trySynthesisNetwork'),
+                  String(errorMessage),
+                ),
+              )
+              toast.success(t('common.messages.success.copySuccess'))
+            },
+          }),
+      },
+    })
+  } finally {
+    tryListeningLoading.value = false
+  }
+}
+
 onMounted(async () => {
-  await fetchVoices()
-  if (appStore.voice && !appStore.originalVoicesList.find((v: any) => v.Name === appStore.voice?.Name)) {
-    appStore.voice = null
+  if (appStore.ttsConfig.elevenlabsApiKey) {
+    await fetchElevenlabsVoices()
   }
 })
 
@@ -265,19 +279,17 @@ onUnmounted(() => {
   }
 })
 
-// 配置弹窗
-const configDialogShow = ref(false)
-
 // 合成到文件（暴露给外部组件调用）
 const synthesizedSpeechToFile = async (option: { text: string; withCaption?: boolean }) => {
   if (!configValid()) throw new Error(t('features.tts.errors.configInvalid') as string)
 
   try {
-    const result = await window.electron.edgeTtsSynthesizeToFile({
+    const result = await window.electron.elevenlabsTtsSynthesizeToFile({
       text: option.text,
-      voice: appStore.voice!.ShortName,
+      voiceId: appStore.ttsConfig.elevenlabsVoiceId,
       options: {
-        rate: appStore.speed,
+        speed: appStore.ttsConfig.elevenlabsSpeed,
+        modelId: appStore.ttsConfig.elevenlabsModelId,
       },
       withCaption: option?.withCaption,
     })
@@ -293,15 +305,14 @@ defineExpose({ synthesizedSpeechToFile })
 
 <style lang="scss" scoped>
 .tts-control {
-  min-height: 0;
+  min-height: auto;
 }
 
 .tts-panel {
-  height: 100%;
-  padding: 20px;
+  padding: 16px;
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 12px;
 }
 
 .tts-panel__header {
@@ -316,24 +327,16 @@ defineExpose({ synthesizedSpeechToFile })
 }
 
 .tts-panel__body {
-  flex: 1;
-  min-height: 0;
   display: flex;
   flex-direction: column;
-  gap: 14px;
-}
-
-.tts-panel__grid {
-  display: grid;
-  grid-template-columns: 1fr;
-  gap: 12px;
+  gap: 10px;
 }
 
 .tts-panel__listen {
-  padding: 14px;
+  padding: 12px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 10px;
 }
 
 .tts-panel__actions {
@@ -343,5 +346,75 @@ defineExpose({ synthesizedSpeechToFile })
 
 .tts-panel__primary-action {
   flex: 1;
+}
+
+.tts-config-dialog__body {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+
+.tts-config-dialog__section-title {
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--workbench-text);
+}
+
+.tts-config-dialog__actions {
+  display: flex;
+  align-items: center;
+}
+
+.tts-model-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+
+.tts-model-card {
+  width: 100%;
+  border: 1px solid rgba(96, 72, 41, 0.12);
+  background: rgba(255, 255, 255, 0.9);
+  border-radius: 18px;
+  padding: 14px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  text-align: left;
+}
+
+.tts-model-card--selected {
+  border-color: rgba(90, 78, 200, 0.6);
+  box-shadow: 0 12px 28px rgba(90, 78, 200, 0.12);
+}
+
+.tts-model-card__top,
+.tts-model-card__title-row,
+.tts-model-card__chips {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+
+.tts-model-card__title {
+  font-size: 16px;
+  font-weight: 700;
+  color: var(--workbench-text);
+}
+
+.tts-model-card__badge,
+.tts-model-card__chip {
+  padding: 5px 12px;
+  border-radius: 999px;
+  background: rgba(80, 57, 30, 0.08);
+  color: var(--workbench-text);
+  font-size: 12px;
+}
+
+.tts-model-card__desc {
+  color: var(--workbench-text-soft);
+  line-height: 1.6;
 }
 </style>

@@ -42,24 +42,20 @@ export const useAppStore = defineStore(
     // 素材文件路径列表，用于智能匹配选片时限定范围
     const videoAssets = ref<string[]>([])
 
-    // 语音合成（Edge TTS 免费版）
+    // 语音合成（ElevenLabs）
     const ttsConfig = ref({
-      voice: 'zh-CN-XiaoxiaoNeural',
-      pitch: 0,
-      rate: 0,
-      volume: 0,
+      elevenlabsApiKey: '',
+      elevenlabsVoiceId: '',
+      elevenlabsModelId: 'eleven_multilingual_v2',
+      elevenlabsSpeed: 1,
     })
     const updateTtsConfig = (newConfig: typeof ttsConfig.value) => {
       ttsConfig.value = newConfig
     }
     const tryListeningText = ref('Hello，欢迎使用乌鸦视频工厂！')
 
-    // Edge TTS 语音列表相关
-    const originalVoicesList = ref<any[]>([])
-    const language = ref('Chinese')
-    const gender = ref<'Male' | 'Female'>('Female')
-    const voice = ref<any | null>(null)
-    const speed = ref(0)
+    // ElevenLabs 语音列表
+    const elevenlabsVoicesList = ref<any[]>([])
 
     // 合成配置
     const renderConfig = ref({
@@ -120,11 +116,7 @@ export const useAppStore = defineStore(
       updateTtsConfig,
       tryListeningText,
 
-      originalVoicesList,
-      language,
-      gender,
-      voice,
-      speed,
+      elevenlabsVoicesList,
 
       renderConfig,
       autoBatch,
@@ -151,6 +143,7 @@ export const useAppStore = defineStore(
         'analysisProgress',
         'currentProduct',
         'videoAssets',
+        'elevenlabsVoicesList',
       ],
     },
   },

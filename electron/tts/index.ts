@@ -1,16 +1,21 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import { EdgeTTS } from '../lib/edge-tts'
+import { ElevenLabsTTS } from '../lib/elevenlabs-tts'
 import { parseBuffer } from 'music-metadata'
 import {
   EdgeTtsSynthesizeCommonParams,
   EdgeTtsSynthesizeToFileParams,
   EdgeTtsSynthesizeToFileResult,
+  ElevenLabsTtsSynthesizeCommonParams,
+  ElevenLabsTtsSynthesizeToFileParams,
+  ElevenLabsTtsSynthesizeToFileResult,
 } from './types'
 import { getAppTempPath } from '../lib/tools'
 import { app } from 'electron'
 
 const edgeTts = new EdgeTTS()
+const elevenLabsTts = new ElevenLabsTTS()
 const setupTime = new Date().getTime()
 
 export function getTempTtsVoiceFilePath() {
@@ -89,5 +94,59 @@ export async function edgeTtsSynthesizeToFile(
   return {
     duration,
     subtitlePath,
+  }
+}
+
+// ElevenLabs TTS functions
+export function elevenLabsTtsSetApiKey(apiKey: string) {
+  elevenLabsTts.setApiKey(apiKey)
+}
+
+export async function elevenLabsTtsGetVoiceList(params?: { pageSize?: number; language?: string; gender?: string; category?: string; age?: string; search?: string }) {
+  return elevenLabsTts.getVoices(params)
+}
+
+export async function elevenLabsTtsSynthesizeToBase64(params: ElevenLabsTtsSynthesizeCommonParams) {
+  const { text, voiceId, options } = params
+  const result = await elevenLabsTts.synthesize(text, voiceId, options)
+  return result.toBase64()
+}
+
+export async function elevenLabsTtsSynthesizeToFile(
+  params: ElevenLabsTtsSynthesizeToFileParams,
+): Promise<ElevenLabsTtsSynthesizeToFileResult> {
+  const { text, voiceId, options } = params
+  const result = await elevenLabsTts.synthesize(text, voiceId, options)
+
+  let outputPath = params.outputPath ?? getTempTtsVoiceFilePath()
+  if (fs.existsSync(outputPath)) {
+    fs.unlinkSync(outputPath)
+  }
+  if (!fs.existsSync(path.dirname(outputPath))) {
+    fs.mkdirSync(path.dirname(outputPath), { recursive: true })
+  }
+  await result.toFile(outputPath)
+
+  // ElevenLabs doesn't provide word-level timestamps for captions
+  // So we skip subtitle generation for now
+  const subtitlePath: string | undefined = undefined
+
+  // 指定 mimeType 为 audio/mpeg (MP3)，避免自动检测格式失败
+  let duration = 0
+  try {
+    const metadata = await parseBuffer(result.getBuffer(), { mimeType: 'audio/mpeg' })
+    duration = metadata.format?.duration ?? 0
+  } catch (error: any) {
+    throw new Error(`音频元数据解析失败: ${error?.message ?? String(error)}`)
+  }
+
+  if (!Number.isFinite(duration) || duration <= 0) {
+    throw new Error('音频时长无效，请检查TTS配置或网络连接')
+  }
+
+  return {
+    duration,
+    subtitlePath,
+    voicePath: outputPath,
   }
 }

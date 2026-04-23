@@ -12,7 +12,7 @@ import {
   SelectFolderParams,
   StatEventParams,
 } from './types'
-import { EdgeTtsSynthesizeToFileParams } from './tts/types'
+import { EdgeTtsSynthesizeToFileParams, ElevenLabsTtsSynthesizeToFileParams } from './tts/types'
 import { RenderVideoParams } from './ffmpeg/types'
 import type { VLApiConfig, MatchVideoSegmentsParams } from './vl/types'
 
@@ -66,6 +66,17 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('edge-tts-synthesize-to-base64', params),
   edgeTtsSynthesizeToFile: (params: EdgeTtsSynthesizeToFileParams) =>
     ipcRenderer.invoke('edge-tts-synthesize-to-file', params),
+  // ElevenLabs TTS
+  elevenlabsTtsSetApiKey: (params: { apiKey: string }) =>
+    ipcRenderer.invoke('elevenlabs-tts-set-api-key', params),
+  elevenlabsTtsGetVoiceList: (
+    params?: { pageSize?: number; language?: string; gender?: string; category?: string; age?: string; search?: string },
+  ): Promise<{ voices: any[]; hasMore: boolean }> =>
+    ipcRenderer.invoke('elevenlabs-tts-get-voice-list', params),
+  elevenlabsTtsSynthesizeToBase64: (params: any) =>
+    ipcRenderer.invoke('elevenlabs-tts-synthesize-to-base64', params),
+  elevenlabsTtsSynthesizeToFile: (params: ElevenLabsTtsSynthesizeToFileParams) =>
+    ipcRenderer.invoke('elevenlabs-tts-synthesize-to-file', params),
   renderVideo: (params: RenderVideoParams) => ipcRenderer.invoke('render-video', params),
   // LLM 音视频同步匹配
   vlMatchByLLM: (params: {

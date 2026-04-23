@@ -76,7 +76,13 @@ const buildProductContext = (): string | undefined => {
   if (!product) return undefined
 
   const parts: string[] = []
-  parts.push(`补充产品信息如下，请优先围绕这些卖点写：`)
+  parts.push(`你是一个专业的短视频口播文案撰写人。请严格遵守以下规则：`)
+  parts.push(`1. 只输出口播文案正文，不要输出标题、标签、分段、markdown格式`)
+  parts.push(`2. 文案必须是口语化的，像真人说话一样自然流畅`)
+  parts.push(`3. 字数严格控制在80-150字，适合15-30秒的短视频`)
+  parts.push(`4. 必须突出产品卖点，有吸引力和购买欲`)
+  parts.push(``)
+  parts.push(`产品信息：`)
   parts.push(`产品名称：${product.name}`)
   if (product.features) parts.push(`核心功能：${product.features}`)
   if (product.highlights) parts.push(`产品亮点：${product.highlights}`)
@@ -163,7 +169,6 @@ const handleRenderVideo = async () => {
     appStore.updateRenderStatus(RenderStatus.SynthesizedSpeech)
     const ttsResult = await TtsControlInstance.value?.synthesizedSpeechToFile({
       text,
-      withCaption: true,
     })
     if (ttsResult?.duration === undefined) {
       throw new Error(t('features.tts.errors.fileCorrupt'))
@@ -181,73 +186,25 @@ const handleRenderVideo = async () => {
 
     let videoSegments: { videoFiles: string[]; timeRanges: [string, string][] } | null = null
 
-    // LLM 音视频同步匹配优先
-    if (appStore.renderConfig.llmSyncEnabled) {
-      if (!ttsResult.subtitlePath) {
-        throw new Error('LLM 匹配模式需要字幕文件，请确保 TTS 合成时开启字幕')
-      }
-      if (!appStore.llmConfig.apiKey) {
-        throw new Error('LLM 匹配模式需要配置 LLM API Key')
-      }
-      if (appStore.videoAssets.length === 0) {
-        throw new Error('LLM 匹配模式需要先添加视频素材')
-      }
-      try {
-        const matched = await window.electron.vlMatchByLLM({
-          subtitleFile: ttsResult.subtitlePath,
-          videoAssets: JSON.parse(JSON.stringify(appStore.videoAssets)),
-          targetDuration: ttsResult.duration,
-          productInfo: appStore.currentProduct
-            ? {
-                name: appStore.currentProduct.name,
-                features: appStore.currentProduct.features || undefined,
-                highlights: appStore.currentProduct.highlights || undefined,
-                targetAudience: appStore.currentProduct.target_audience || undefined,
-              }
-            : undefined,
-          llmConfig: {
-            apiUrl: appStore.llmConfig.apiUrl,
-            apiKey: appStore.llmConfig.apiKey,
-            modelName: appStore.llmConfig.modelName,
-          },
-        })
-        if (matched.videoFiles.length > 0) {
-          videoSegments = matched
-          console.log('使用 LLM 音视频同步匹配，片段数:', matched.videoFiles.length)
-        }
-      } catch (e) {
-        console.warn('LLM 匹配失败，回退到本地匹配:', e)
-      }
-    }
-
-    // 本地智能匹配选片（llmSyncEnabled 为 false 或 LLM 失败时）
-    if (!videoSegments && appStore.smartMatchEnabled && appStore.currentProduct) {
+    // 尝试智能匹配选片
+    if (appStore.smartMatchEnabled && appStore.currentProduct) {
       try {
         let productColors: string[] = []
         let productTags: string[] = []
-        let productSceneTags: string[] = []
         try {
           productColors = JSON.parse(appStore.currentProduct.colors)
         } catch {}
         try {
           productTags = JSON.parse(appStore.currentProduct.tags)
         } catch {}
-        try {
-          productSceneTags = JSON.parse(appStore.currentProduct.scene_tags || '[]')
-        } catch {}
 
         if (productColors.length > 0 || productTags.length > 0) {
           const matched = await window.electron.vlMatchVideoSegments({
             productColors,
             productTags,
-            productSceneTags,
             targetDuration: ttsResult.duration,
-            videoPaths:
-              appStore.videoAssets.length > 0
-                ? JSON.parse(JSON.stringify(appStore.videoAssets))
-                : undefined,
-            text,
-            matchMode: appStore.renderConfig.matchMode ?? 'auto',
+            videoPaths: appStore.videoAssets.length > 0 ? appStore.videoAssets : undefined,
+            text, // 传入文案文本用于语义对齐选片
           })
           // 只在匹配到足够片段时使用智能匹配结果
           if (matched.videoFiles.length > 0) {
@@ -259,12 +216,12 @@ const handleRenderVideo = async () => {
             // 如果匹配时长 >= 目标的 80%，直接使用；否则回退到随机
             if (matchedDuration >= ttsResult.duration * 0.8) {
               videoSegments = matched
-              console.log('使用本地智能匹配选片，匹配时长:', matchedDuration)
+              console.log('使用智能匹配选片，匹配时长:', matchedDuration)
             }
           }
         }
       } catch (e) {
-        console.warn('本地智能匹配失败，回退到随机选片:', e)
+        console.warn('智能匹配失败，回退到随机选片:', e)
       }
     }
 
@@ -291,6 +248,7 @@ const handleRenderVideo = async () => {
     await window.electron.renderVideo({
       ...videoSegments,
       audioFiles: {
+        voice: ttsResult.voicePath,
         bgm: randomBgm?.path,
       },
       outputSize: {
@@ -298,7 +256,6 @@ const handleRenderVideo = async () => {
         height: appStore.renderConfig.outputSize.height,
       },
       outputDuration: String(ttsResult.duration),
-      subtitleFile: ttsResult.subtitlePath,
       outputPath:
         appStore.renderConfig.outputPath.replace(/\\/g, '/') +
         '/' +
@@ -431,7 +388,7 @@ const handleCancelRender = () => {
 }
 
 .home-column-stack--creative-top {
-  flex: 0 0 52%;
+  flex: 0 0 43%;
   min-height: 260px;
 }
 
@@ -440,8 +397,8 @@ const handleCancelRender = () => {
 }
 
 .home-column-stack--execute-top {
-  flex: 0 0 300px;
-  min-height: 300px;
+  flex: 0 0 390px;
+  min-height: 390px;
   overflow: hidden;
 }
 

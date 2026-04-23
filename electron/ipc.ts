@@ -26,6 +26,12 @@ import {
   deleteProductReference,
   updateProductReferenceAnalysis,
 } from './vl/analyze-product'
+import {
+  elevenLabsTtsSetApiKey,
+  elevenLabsTtsGetVoiceList,
+  elevenLabsTtsSynthesizeToBase64,
+  elevenLabsTtsSynthesizeToFile,
+} from './tts'
 import type { VLApiConfig } from './vl/types'
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url))
@@ -180,6 +186,26 @@ export default function initIPC() {
   // 保存语音合成到文件（Edge TTS，支持字幕）
   ipcMain.handle('edge-tts-synthesize-to-file', (_event, params) =>
     edgeTtsSynthesizeToFile(params),
+  )
+
+  // 设置 ElevenLabs API Key
+  ipcMain.handle('elevenlabs-tts-set-api-key', (_event, params: { apiKey: string }) => {
+    elevenLabsTtsSetApiKey(params.apiKey)
+  })
+
+  // 获取 ElevenLabs 语音列表
+  ipcMain.handle('elevenlabs-tts-get-voice-list', (_event, params?: { pageSize?: number; language?: string; gender?: string; category?: string; age?: string; search?: string }) =>
+    elevenLabsTtsGetVoiceList(params),
+  )
+
+  // ElevenLabs 语音合成返回 Base64（用于试听）
+  ipcMain.handle('elevenlabs-tts-synthesize-to-base64', (_event, params) =>
+    elevenLabsTtsSynthesizeToBase64(params),
+  )
+
+  // ElevenLabs 保存语音合成到文件
+  ipcMain.handle('elevenlabs-tts-synthesize-to-file', (_event, params) =>
+    elevenLabsTtsSynthesizeToFile(params),
   )
 
   // 统计事件上报

@@ -47,6 +47,15 @@ interface Window {
     edgeTtsSynthesizeToFile: (
       params: import('./tts/types').EdgeTtsSynthesizeToFileParams,
     ) => Promise<import('./tts/types').EdgeTtsSynthesizeToFileResult>
+    // ElevenLabs TTS
+    elevenlabsTtsSetApiKey: (params: { apiKey: string }) => Promise<void>
+    elevenlabsTtsGetVoiceList: (
+      params?: { pageSize?: number; language?: string; gender?: string; category?: string; age?: string; search?: string },
+    ) => Promise<{ voices: any[]; hasMore: boolean }>
+    elevenlabsTtsSynthesizeToBase64: (params: any) => Promise<string>
+    elevenlabsTtsSynthesizeToFile: (
+      params: import('./tts/types').ElevenLabsTtsSynthesizeToFileParams,
+    ) => Promise<import('./tts/types').ElevenLabsTtsSynthesizeToFileResult>
     renderVideo: (
       params: import('./ffmpeg/types').RenderVideoParams,
     ) => Promise<import('./ffmpeg/types').ExecuteFFmpegResult>
