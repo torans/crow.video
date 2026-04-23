@@ -133,7 +133,14 @@
         </v-dialog>
       </div>
 
-      <div class="render-panel__content workbench-editor-surface">
+      <div
+        class="render-panel__content workbench-editor-surface"
+        :class="{
+          'render-panel__content--active': taskInProgress,
+          'render-panel__content--rendering': appStore.renderStatus === RenderStatus.Rendering,
+        }"
+        :style="{ '--render-progress': `${Math.max(0, Math.min(renderProgress, 100))}%` }"
+      >
         <div class="render-panel__status-row">
           <div class="render-panel__status-copy">
             <v-chip :color="statusChipColor" variant="tonal" size="small">
@@ -143,14 +150,8 @@
               {{ taskInProgress ? workspaceText('runningHint') : workspaceText('idleHint') }}
             </div>
           </div>
-          <div class="render-panel__progress">
-            <v-progress-circular
-              color="primary"
-              v-model="renderProgress"
-              :indeterminate="taskInProgress && appStore.renderStatus !== RenderStatus.Rendering"
-              :size="42"
-              :width="4"
-            />
+          <div class="render-panel__orbit-indicator" aria-hidden="true">
+            <span class="render-panel__orbit-core"></span>
           </div>
         </div>
 
@@ -334,10 +335,10 @@ const handleSelectBgmFolder = async () => {
   flex: 1;
   min-height: 0;
   height: 100%;
-  padding: 16px;
+  padding: 24px 24px 28px;
   display: flex;
   flex-direction: column;
-  gap: 12px;
+  gap: 20px;
   overflow: hidden;
 }
 
@@ -346,8 +347,9 @@ const handleSelectBgmFolder = async () => {
   flex-shrink: 0;
   display: flex;
   align-items: flex-start;
-  gap: 12px;
-  padding-right: 88px;
+  gap: 16px;
+  padding-right: 132px;
+  min-height: 72px;
 }
 
 .render-panel__identity {
@@ -377,28 +379,136 @@ const handleSelectBgmFolder = async () => {
 }
 
 .render-panel__content {
+  flex: 1;
+  min-height: 0;
+  position: relative;
   display: flex;
   flex-direction: column;
-  gap: 10px;
-  padding: 12px;
+  gap: 18px;
+  padding: 18px 20px 22px;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.render-panel__content::before,
+.render-panel__content::after {
+  content: '';
+  position: absolute;
+  inset: -2px;
+  border-radius: 22px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.24s var(--workbench-ease);
+}
+
+.render-panel__content::before {
+  background:
+    linear-gradient(90deg, rgba(114, 71, 235, 0.18), rgba(61, 120, 255, 0.14), rgba(114, 71, 235, 0.18));
+  filter: blur(10px);
+}
+
+.render-panel__content::after {
+  padding: 2px;
+  background:
+    conic-gradient(
+      from 0deg,
+      rgba(255, 255, 255, 0) 0deg,
+      rgba(255, 255, 255, 0) 285deg,
+      rgba(129, 92, 255, 0.35) 315deg,
+      rgba(110, 73, 255, 0.95) 336deg,
+      rgba(64, 140, 255, 1) 350deg,
+      rgba(255, 255, 255, 0) 360deg
+    );
+  -webkit-mask:
+    linear-gradient(#fff 0 0) content-box,
+    linear-gradient(#fff 0 0);
+  -webkit-mask-composite: xor;
+  mask-composite: exclude;
+  animation: render-panel-orbit 2.8s linear infinite;
+}
+
+.render-panel__content--active::before,
+.render-panel__content--active::after {
+  opacity: 1;
+}
+
+.render-panel__content--rendering::after {
+  background:
+    conic-gradient(
+      from 0deg,
+      rgba(255, 255, 255, 0) 0deg,
+      rgba(255, 255, 255, 0) calc((var(--render-progress, 0%) * 3.6) - 26deg),
+      rgba(89, 238, 255, 0.85) calc((var(--render-progress, 0%) * 3.6) - 18deg),
+      rgba(111, 87, 255, 1) calc(var(--render-progress, 0%) * 3.6),
+      rgba(255, 255, 255, 0) calc((var(--render-progress, 0%) * 3.6) + 10deg)
+    );
+  animation-duration: 1.8s;
 }
 
 .render-panel__status-row {
   display: flex;
-  align-items: center;
+  align-items: flex-start;
   justify-content: space-between;
-  gap: 12px;
+  gap: 18px;
 }
 
 .render-panel__status-copy {
   display: flex;
   flex-direction: column;
-  gap: 8px;
+  gap: 12px;
   min-width: 0;
 }
 
 .render-panel__progress {
   flex: 0 0 auto;
+  padding-top: 6px;
+}
+
+.render-panel__orbit-indicator {
+  width: 62px;
+  height: 62px;
+  flex: 0 0 62px;
+  border-radius: 999px;
+  display: grid;
+  place-items: center;
+  position: relative;
+  background: radial-gradient(circle at 35% 35%, rgba(255, 255, 255, 0.92), rgba(255, 251, 247, 0.25));
+  border: 1px solid rgba(107, 78, 239, 0.1);
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  overflow: hidden;
+}
+
+.render-panel__orbit-indicator::before {
+  content: '';
+  position: absolute;
+  inset: 5px;
+  border-radius: inherit;
+  background:
+    conic-gradient(
+      from 0deg,
+      rgba(255, 255, 255, 0) 0deg,
+      rgba(255, 255, 255, 0) 290deg,
+      rgba(130, 91, 255, 0.2) 320deg,
+      rgba(99, 76, 249, 0.92) 344deg,
+      rgba(64, 146, 255, 1) 360deg
+    );
+  animation: render-panel-orbit 2.4s linear infinite;
+  opacity: 0;
+  transition: opacity 0.24s var(--workbench-ease);
+}
+
+.render-panel__content--active .render-panel__orbit-indicator::before {
+  opacity: 1;
+}
+
+.render-panel__orbit-core {
+  width: 42px;
+  height: 42px;
+  border-radius: 999px;
+  background: linear-gradient(180deg, rgba(255, 255, 255, 0.96), rgba(245, 239, 255, 0.88));
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 8px 18px rgba(81, 54, 205, 0.12);
 }
 
 .render-panel__controls-row {
@@ -408,31 +518,37 @@ const handleSelectBgmFolder = async () => {
 
 .render-panel__primary-btn {
   width: 100%;
-  min-height: 46px;
+  min-height: 64px;
+  border-radius: 28px;
+  font-size: 24px;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
 .render-panel__hint {
-  font-size: 12px;
+  font-size: 15px;
   color: var(--workbench-text-soft);
-  line-height: 1.45;
+  line-height: 1.6;
 }
 
 .render-panel__toggles {
+  margin-top: auto;
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
-  gap: 10px;
+  gap: 16px;
 }
 
 .render-panel__toggle-item {
   min-width: 0;
-  padding: 10px 12px;
-  border-radius: 14px;
+  min-height: 96px;
+  padding: 18px 20px;
+  border-radius: 24px;
   background: rgba(255, 255, 255, 0.72);
   border: 1px solid rgba(96, 72, 41, 0.08);
   display: flex;
   align-items: center;
   justify-content: space-between;
-  gap: 10px;
+  gap: 16px;
 }
 
 .render-panel__toggle-copy {
@@ -440,12 +556,22 @@ const handleSelectBgmFolder = async () => {
 }
 
 .render-panel__toggle-title {
-  font-size: 13px;
-  line-height: 1.3;
+  font-size: 18px;
+  line-height: 1.35;
   color: var(--workbench-text);
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+}
+
+@keyframes render-panel-orbit {
+  from {
+    transform: rotate(0deg);
+  }
+
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 </style>

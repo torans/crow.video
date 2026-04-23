@@ -56,6 +56,9 @@ interface Window {
     elevenlabsTtsSynthesizeToFile: (
       params: import('./tts/types').ElevenLabsTtsSynthesizeToFileParams,
     ) => Promise<import('./tts/types').ElevenLabsTtsSynthesizeToFileResult>
+    getMediaDuration: (
+      params: import('./ffmpeg/types').GetMediaDurationParams,
+    ) => Promise<number>
     renderVideo: (
       params: import('./ffmpeg/types').RenderVideoParams,
     ) => Promise<import('./ffmpeg/types').ExecuteFFmpegResult>

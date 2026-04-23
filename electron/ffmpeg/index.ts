@@ -1,7 +1,7 @@
 import fs from 'node:fs'
 import os from 'os'
 import { spawn } from 'child_process'
-import { ExecuteFFmpegResult, RenderVideoParams } from './types'
+import { ExecuteFFmpegResult, GetMediaDurationParams, RenderVideoParams } from './types'
 import { getTempTtsVoiceFilePath } from '../tts'
 import path from 'node:path'
 import { generateUniqueFileName } from '../lib/tools'
@@ -98,6 +98,56 @@ export async function renderVideo(
   } catch (error) {
     throw error
   }
+}
+
+export async function getMediaDuration(
+  params: GetMediaDurationParams,
+): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const timeoutMs = params.timeoutMs ?? 10000
+    const child = spawn(ffmpegPath, ['-i', params.inputPath], {
+      cwd: process.cwd(),
+      env: process.env,
+    })
+
+    let stderr = ''
+    let settled = false
+    console.log(`[ffmpeg] 开始探测媒体时长: ${params.inputPath}`)
+
+    const timeout = setTimeout(() => {
+      if (settled) return
+      settled = true
+      child.kill('SIGTERM')
+      reject(new Error(`获取媒体时长超时: ${params.inputPath}`))
+    }, timeoutMs)
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+
+    child.on('close', () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      const match = stderr.match(/Duration:\s*(\d+):(\d+):(\d+)\.(\d+)/)
+      if (!match) {
+        reject(new Error(`无法解析媒体时长: ${params.inputPath}`))
+        return
+      }
+
+      const [, h, m, s, cs] = match.map(Number)
+      const duration = h * 3600 + m * 60 + s + cs / 100
+      console.log(`[ffmpeg] 媒体时长探测完成: ${params.inputPath} -> ${duration.toFixed(3)}s`)
+      resolve(duration)
+    })
+
+    child.on('error', (error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      reject(new Error(`Failed to probe media duration: ${error.message}`))
+    })
+  })
 }
 
 export async function executeFFmpeg(

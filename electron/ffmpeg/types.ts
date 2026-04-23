@@ -20,3 +20,8 @@ export interface ExecuteFFmpegResult {
   stderr: string
   code: number
 }
+
+export interface GetMediaDurationParams {
+  inputPath: string
+  timeoutMs?: number
+}

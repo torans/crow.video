@@ -10,7 +10,7 @@ import {
   StatEventParams,
 } from './types'
 import { edgeTtsGetVoiceList, edgeTtsSynthesizeToBase64, edgeTtsSynthesizeToFile } from './tts'
-import { renderVideo } from './ffmpeg'
+import { getMediaDuration, renderVideo } from './ffmpeg'
 import { sendStatEvent } from './lib/stat'
 import { testVLConnection } from './vl'
 import { matchVideoSegments } from './vl/match'
@@ -227,6 +227,10 @@ export default function initIPC() {
 
     return renderVideo({ ...params, onProgress, abortSignal: controller.signal })
   })
+
+  ipcMain.handle('get-media-duration', (_event, params: { inputPath: string }) =>
+    getMediaDuration(params),
+  )
 
   // === VL 视觉大模型相关 ===
 

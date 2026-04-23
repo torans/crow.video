@@ -13,7 +13,7 @@ import {
   StatEventParams,
 } from './types'
 import { EdgeTtsSynthesizeToFileParams, ElevenLabsTtsSynthesizeToFileParams } from './tts/types'
-import { RenderVideoParams } from './ffmpeg/types'
+import { GetMediaDurationParams, RenderVideoParams } from './ffmpeg/types'
 import type { VLApiConfig, MatchVideoSegmentsParams } from './vl/types'
 
 // --------- 向界面渲染进程暴露某些API ---------
@@ -77,6 +77,8 @@ contextBridge.exposeInMainWorld('electron', {
     ipcRenderer.invoke('elevenlabs-tts-synthesize-to-base64', params),
   elevenlabsTtsSynthesizeToFile: (params: ElevenLabsTtsSynthesizeToFileParams) =>
     ipcRenderer.invoke('elevenlabs-tts-synthesize-to-file', params),
+  getMediaDuration: (params: GetMediaDurationParams) =>
+    ipcRenderer.invoke('get-media-duration', params),
   renderVideo: (params: RenderVideoParams) => ipcRenderer.invoke('render-video', params),
   // LLM 音视频同步匹配
   vlMatchByLLM: (params: {

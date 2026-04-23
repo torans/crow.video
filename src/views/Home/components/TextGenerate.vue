@@ -185,6 +185,33 @@ const languageOptions = [
   { label: '德语', value: 'Deutsch' }
 ]
 
+function sanitizeGeneratedScript(raw: string): string {
+  let text = raw.trim()
+  if (!text) return ''
+
+  text = text
+    .replace(/```[\s\S]*?```/g, ' ')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^\s{0,3}#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '')
+    .replace(/^\s*\d+[.)]\s+/gm, '')
+    .replace(/\*\*([^*]+)\*\*/g, '$1')
+    .replace(/\*([^*]+)\*/g, '$1')
+    .replace(/__([^_]+)__/g, '$1')
+    .replace(/_([^_]+)_/g, '$1')
+    .replace(/^\s*(hook|content|cta|标题|文案|脚本|口播稿|正文)\s*[:：]\s*/gim, '')
+    .replace(/\n+/g, ' ')
+    .replace(/\s{2,}/g, ' ')
+    .trim()
+
+  const labelledSections = [...text.matchAll(/(?:^|\s)(?:hook|content|cta)\s*[:：]\s*/gim)]
+  if (labelledSections.length > 0) {
+    text = text.replace(/(?:^|\s)(?:hook|content|cta)\s*[:：]\s*/gim, ' ').replace(/\s{2,}/g, ' ').trim()
+  }
+
+  return text
+}
+
 const buildSystemPrompt = (productContext?: string): string => {
   if (productContext) return productContext
   const lang = appStore.llmConfig.language || '中文'
@@ -280,8 +307,9 @@ const handleGenerate = async (options?: { noToast?: boolean; productContext?: st
     for await (const textPart of result.textStream) {
       rawText += textPart
     }
-    outputText.value = rawText
-    return rawText
+    const sanitizedText = sanitizeGeneratedScript(rawText)
+    outputText.value = sanitizedText
+    return sanitizedText
   } catch (error: any) {
     if (error?.name !== 'AbortError') {
       const errorMessage = error?.error?.message || error?.message || String(error)

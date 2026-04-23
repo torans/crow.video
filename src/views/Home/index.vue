@@ -169,7 +169,16 @@ const handleRenderVideo = async () => {
     appStore.updateRenderStatus(RenderStatus.SynthesizedSpeech)
     const ttsResult = await TtsControlInstance.value?.synthesizedSpeechToFile({
       text,
+      withCaption: true,
     })
+    console.log(
+      '[render] TTS结果:',
+      JSON.stringify({
+        duration: ttsResult?.duration,
+        voicePath: ttsResult?.voicePath,
+        textLength: text.length,
+      }),
+    )
     if (ttsResult?.duration === undefined) {
       throw new Error(t('features.tts.errors.fileCorrupt'))
     }
@@ -232,6 +241,13 @@ const handleRenderVideo = async () => {
           duration: ttsResult.duration,
         })) ?? null
     }
+    console.log(
+      '[render] 分镜结果:',
+      JSON.stringify({
+        requestedDuration: ttsResult.duration,
+        segmentCount: videoSegments?.videoFiles.length ?? 0,
+      }),
+    )
 
     if (!videoSegments) {
       throw new Error('无法获取视频片段')
@@ -251,6 +267,7 @@ const handleRenderVideo = async () => {
         voice: ttsResult.voicePath,
         bgm: randomBgm?.path,
       },
+      subtitleFile: ttsResult.subtitlePath,
       outputSize: {
         width: appStore.renderConfig.outputSize.width,
         height: appStore.renderConfig.outputSize.height,

@@ -1,5 +1,6 @@
 import fs from 'node:fs'
 import path from 'node:path'
+import { spawn } from 'child_process'
 import { EdgeTTS } from '../lib/edge-tts'
 import { ElevenLabsTTS } from '../lib/elevenlabs-tts'
 import { parseBuffer } from 'music-metadata'
@@ -13,6 +14,11 @@ import {
 } from './types'
 import { getAppTempPath } from '../lib/tools'
 import { app } from 'electron'
+
+const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
+const ffmpegPath: string = VITE_DEV_SERVER_URL
+  ? require('ffmpeg-static')
+  : (require('ffmpeg-static') as string).replace('app.asar', 'app.asar.unpacked')
 
 const edgeTts = new EdgeTTS()
 const elevenLabsTts = new ElevenLabsTTS()
@@ -41,6 +47,48 @@ export function clearCurrentTtsFiles() {
 app.on('before-quit', () => {
   clearCurrentTtsFiles()
 })
+
+async function probeMediaDuration(inputPath: string, timeoutMs: number = 10000): Promise<number> {
+  return new Promise((resolve, reject) => {
+    const child = spawn(ffmpegPath, ['-i', inputPath], {
+      cwd: process.cwd(),
+      env: process.env,
+    })
+    let stderr = ''
+    let settled = false
+
+    const timeout = setTimeout(() => {
+      if (settled) return
+      settled = true
+      child.kill('SIGTERM')
+      reject(new Error(`获取媒体时长超时: ${inputPath}`))
+    }, timeoutMs)
+
+    child.stderr.on('data', (data) => {
+      stderr += data.toString()
+    })
+
+    child.on('close', () => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      const match = stderr.match(/Duration:\s*(\d+):(\d+):(\d+)\.(\d+)/)
+      if (!match) {
+        reject(new Error(`无法解析媒体时长: ${inputPath}`))
+        return
+      }
+      const [, h, m, s, cs] = match.map(Number)
+      resolve(h * 3600 + m * 60 + s + cs / 100)
+    })
+
+    child.on('error', (error) => {
+      if (settled) return
+      settled = true
+      clearTimeout(timeout)
+      reject(new Error(`Failed to probe media duration: ${error.message}`))
+    })
+  })
+}
 
 export async function edgeTtsGetVoiceList() {
   return edgeTts.getVoices()
@@ -115,8 +163,10 @@ export async function elevenLabsTtsSynthesizeToBase64(params: ElevenLabsTtsSynth
 export async function elevenLabsTtsSynthesizeToFile(
   params: ElevenLabsTtsSynthesizeToFileParams,
 ): Promise<ElevenLabsTtsSynthesizeToFileResult> {
-  const { text, voiceId, options } = params
-  const result = await elevenLabsTts.synthesize(text, voiceId, options)
+  const { text, voiceId, options, withCaption } = params
+  const result = withCaption
+    ? await elevenLabsTts.synthesizeWithTimestamps(text, voiceId, options)
+    : await elevenLabsTts.synthesize(text, voiceId, options)
 
   let outputPath = params.outputPath ?? getTempTtsVoiceFilePath()
   if (fs.existsSync(outputPath)) {
@@ -127,15 +177,23 @@ export async function elevenLabsTtsSynthesizeToFile(
   }
   await result.toFile(outputPath)
 
-  // ElevenLabs doesn't provide word-level timestamps for captions
-  // So we skip subtitle generation for now
-  const subtitlePath: string | undefined = undefined
+  let subtitlePath: string | undefined
+  if (withCaption && typeof result.getCaptionAssString === 'function') {
+    const assString = result.getCaptionAssString(80, 300, 1920, 1080)
+    if (assString) {
+      subtitlePath = path.join(path.dirname(outputPath), path.basename(outputPath, '.mp3') + '.ass')
+      if (fs.existsSync(subtitlePath)) {
+        fs.unlinkSync(subtitlePath)
+      }
+      fs.writeFileSync(subtitlePath, assString)
+    }
+  }
 
-  // 指定 mimeType 为 audio/mpeg (MP3)，避免自动检测格式失败
+  // ElevenLabs 的 MP3 可能是 VBR，直接解析内存 buffer 容易高估时长。
+  // 这里以实际落盘文件为准，避免后续分镜阶段追一个错误的大目标时长。
   let duration = 0
   try {
-    const metadata = await parseBuffer(result.getBuffer(), { mimeType: 'audio/mpeg' })
-    duration = metadata.format?.duration ?? 0
+    duration = await probeMediaDuration(outputPath)
   } catch (error: any) {
     throw new Error(`音频元数据解析失败: ${error?.message ?? String(error)}`)
   }
@@ -143,6 +201,8 @@ export async function elevenLabsTtsSynthesizeToFile(
   if (!Number.isFinite(duration) || duration <= 0) {
     throw new Error('音频时长无效，请检查TTS配置或网络连接')
   }
+
+  console.log(`[tts] ElevenLabs 合成完成: duration=${duration.toFixed(3)}s file=${outputPath}`)
 
   return {
     duration,

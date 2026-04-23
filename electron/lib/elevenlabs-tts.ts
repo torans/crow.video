@@ -52,13 +52,29 @@ export interface SynthesisResult {
   getBuffer(): Buffer
   getFormat(): string
   getSize(): number
+  getCaptionAssString?(
+    fontSize?: number,
+    marginFromBottom?: number,
+    playResY?: number,
+    playResX?: number,
+  ): string
+}
+
+interface CharacterAlignment {
+  characters: string[]
+  character_start_times_seconds?: number[]
+  character_end_times_seconds?: number[]
+  character_start_times_ms?: number[]
+  character_end_times_ms?: number[]
 }
 
 class SynthesisResultImpl implements SynthesisResult {
   private readonly audioBuffer: Buffer
+  private readonly alignment?: CharacterAlignment
 
-  constructor(audioData: Buffer) {
+  constructor(audioData: Buffer, alignment?: CharacterAlignment) {
     this.audioBuffer = audioData
+    this.alignment = alignment
   }
 
   toBase64(): string {
@@ -85,6 +101,100 @@ class SynthesisResultImpl implements SynthesisResult {
 
   getSize(): number {
     return this.audioBuffer.length
+  }
+
+  getCaptionAssString(
+    fontSize: number = 56,
+    marginFromBottom: number = 300,
+    playResY: number = 1920,
+    playResX: number = 1080,
+  ): string {
+    if (!this.alignment?.characters?.length) {
+      return ''
+    }
+
+    const startsMs =
+      this.alignment.character_start_times_ms ??
+      this.alignment.character_start_times_seconds?.map((value) => value * 1000) ??
+      []
+    const endsMs =
+      this.alignment.character_end_times_ms ??
+      this.alignment.character_end_times_seconds?.map((value) => value * 1000) ??
+      []
+
+    if (!startsMs.length || !endsMs.length) {
+      return ''
+    }
+
+    const posY = playResY - marginFromBottom
+    const posX = Math.round(playResX / 2)
+    const formatTimestamp = (ms: number): string => {
+      const safeMs = Math.max(0, Math.floor(ms))
+      const totalSeconds = Math.floor(safeMs / 1000)
+      const hours = Math.floor(totalSeconds / 3600)
+      const minutes = Math.floor((totalSeconds % 3600) / 60)
+      const seconds = totalSeconds % 60
+      const centiseconds = Math.floor((safeMs % 1000) / 10)
+      return `${hours}:${String(minutes).padStart(2, '0')}:${String(seconds).padStart(2, '0')}.${String(centiseconds).padStart(2, '0')}`
+    }
+
+    const assHeader = `[Script Info]
+Title: Generated Subtitles
+PlayResX: ${playResX}
+PlayResY: ${playResY}
+ScriptType: v4.00+
+
+[V4+ Styles]
+Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
+Style: Default,Arial,${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,5,10,10,10,1
+
+[Events]
+Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
+`
+
+    const dialogues: string[] = []
+    let buffer = ''
+    let sentenceStartMs: number | null = null
+    let lastEndMs = 0
+
+    const flush = () => {
+      const text = buffer.trim()
+      if (!text || sentenceStartMs === null) {
+        buffer = ''
+        sentenceStartMs = null
+        return
+      }
+      const styledText = `{\\pos(${posX},${posY})\\fs${fontSize}\\c&H00FFFFFF\\3c&H000000\\4a&H00}${text.replace(/\n/g, '\\N')}`
+      dialogues.push(
+        `Dialogue: 0,${formatTimestamp(sentenceStartMs)},${formatTimestamp(Math.max(lastEndMs, sentenceStartMs + 300))},Default,,0,0,0,,${styledText}`,
+      )
+      buffer = ''
+      sentenceStartMs = null
+    }
+
+    for (let i = 0; i < this.alignment.characters.length; i += 1) {
+      const char = this.alignment.characters[i]
+      const start = startsMs[i] ?? lastEndMs
+      const end = endsMs[i] ?? Math.max(start + 120, lastEndMs)
+      const gap = start - lastEndMs
+
+      if (sentenceStartMs === null) {
+        sentenceStartMs = start
+      } else if (gap > 500) {
+        flush()
+        sentenceStartMs = start
+      }
+
+      buffer += char
+      lastEndMs = end
+
+      if (/[。！？!?；;,\n]/.test(char) || buffer.length >= 26) {
+        flush()
+      }
+    }
+
+    flush()
+    return assHeader + dialogues.join('\n')
   }
 }
 
@@ -141,6 +251,23 @@ export class ElevenLabsTTS {
     voiceId: string,
     options: SynthesisOptions = {},
   ): Promise<SynthesisResult> {
+    return this.requestSynthesis(text, voiceId, options, false)
+  }
+
+  async synthesizeWithTimestamps(
+    text: string,
+    voiceId: string,
+    options: SynthesisOptions = {},
+  ): Promise<SynthesisResult> {
+    return this.requestSynthesis(text, voiceId, options, true)
+  }
+
+  private async requestSynthesis(
+    text: string,
+    voiceId: string,
+    options: SynthesisOptions,
+    withTimestamps: boolean,
+  ): Promise<SynthesisResult> {
     if (!this.apiKey) {
       throw new Error('ElevenLabs API key is not set. Please call setApiKey first.')
     }
@@ -169,23 +296,34 @@ export class ElevenLabsTTS {
     }
 
     let audioBuffer: Buffer
+    let alignment: CharacterAlignment | undefined
 
     try {
       const response = await axios.post(
-        `${this.baseUrl}/v1/text-to-speech/${voiceId}`,
+        `${this.baseUrl}/v1/text-to-speech/${voiceId}${withTimestamps ? '/with-timestamps' : ''}`,
         requestBody,
         {
           headers: {
             'xi-api-key': this.apiKey,
             'Content-Type': 'application/json',
           },
-          responseType: 'arraybuffer',
+          responseType: withTimestamps ? 'json' : 'arraybuffer',
           timeout: 60000,
           params: { output_format: 'mp3_44100_128' },
         },
       )
 
-      audioBuffer = Buffer.from(response.data)
+      if (withTimestamps) {
+        const data = response.data as {
+          audio_base64: string
+          alignment?: CharacterAlignment
+          normalized_alignment?: CharacterAlignment
+        }
+        audioBuffer = Buffer.from(data.audio_base64, 'base64')
+        alignment = data.normalized_alignment ?? data.alignment
+      } else {
+        audioBuffer = Buffer.from(response.data)
+      }
     } catch (error) {
       if (error instanceof AxiosError) {
         if (error.response) {
@@ -213,6 +351,6 @@ export class ElevenLabsTTS {
       throw new Error('ElevenLabs returned empty audio.')
     }
 
-    return new SynthesisResultImpl(audioBuffer)
+    return new SynthesisResultImpl(audioBuffer, alignment)
   }
 }
