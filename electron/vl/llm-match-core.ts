@@ -7,13 +7,14 @@ export interface Sentence {
   end: number
 }
 
-export type SegmentStage = 'hook' | 'content' | 'scene' | 'cta'
+export type SegmentStage = 'hook' | 'content' | 'product' | 'detail' | 'scene' | 'result' | 'cta'
 
 export interface CandidateClip {
   videoPath: string
   timestamp: number
   description: string
   tags: string[]
+  colors: string[]
   relevance: number
   videoDur?: number
   availableDuration?: number
@@ -38,36 +39,53 @@ export interface ProductInfo {
 }
 
 const STAGE_KEYWORDS: Record<SegmentStage, string[]> = {
-  hook: ['抛投', '瞬间', '特写', '动态', '冲击', '爆发', '甩杆', '手感', '直接', '一出手'],
-  content: ['细节', '参数', '线径', '顺滑', '拉力', '性能', '材质', '工艺', '不吸水', '耐磨'],
-  scene: ['野钓', '路亚', '水面', '户外', '岸边', '实战', '使用', '场景', '作钓', '抛竿'],
-  cta: ['展示', '成果', '收获', '上鱼', '大鱼', '成就', '入手', '闭眼冲', '安排', '带回去'],
+  hook: ['吸睛', '瞬间', '动态', '冲击', '爆发', '反差', '对比', '预览', '高光', '关键', '根本', '核心', '认知'],
+  content: ['参数', '数据', '顺滑', '体验', '性能', '材质', '工艺', '韧性', '耐磨', '做工', '精度', '重量', '密度'],
+  product: ['产品', '整体', '全貌', '主体', '轮廓', '外观'],
+  detail: ['细节', '特写', '接口', '纹理', '做工', '材质', '表面', '边缘', '厚度'],
+  scene: ['场景', '户外', '实战', '使用', '演示', '操作', '测试', '环境', '现场', '水面', '路面', '场地'],
+  result: ['效果', '结果', '对比', '改善', '变化', '反馈', '稳定', '持久'],
+  cta: ['转化', '尝试', '体验', '现在', '习惯', '记住', '值得', '试试'],
 }
 
 const CTA_HINTS = [
-  '下单',
-  '入手',
-  '安排',
-  '闭眼冲',
+  '尝试',
+  '体验',
   '试试',
-  '带走',
+  '记住',
+  '习惯',
   '现在',
-  '备一卷',
-  '带上',
-  '上链接',
+  '值得',
+  '了解',
+  '入手',
 ]
 const SCENE_HINTS = [
-  '野钓',
-  '路亚',
+  '场景',
   '户外',
-  '水面',
-  '岸边',
   '实战',
   '使用',
-  '场景',
-  '作钓',
-  '上手',
-  '出门',
+  '演示',
+  '操作',
+  '测试',
+  '环境',
+  '水面',
+  '路面',
+  '现场',
+  '场地',
+]
+const PRODUCT_HINTS = [
+  '产品',
+  '细节',
+  '材质',
+  '做工',
+  '表面',
+  '接口',
+  '质感',
+  '重量',
+  '这款',
+  '设计',
+  '工艺',
+  '结构',
 ]
 
 function isSceneText(text: string): boolean {
@@ -78,20 +96,22 @@ function isCtaText(text: string): boolean {
   return CTA_HINTS.some((keyword) => text.includes(keyword))
 }
 
+function isProductText(text: string): boolean {
+  return PRODUCT_HINTS.some((keyword) => text.includes(keyword))
+}
+
 export function detectSentenceStage(text: string, index: number, total: number): SegmentStage {
   const normalized = text.trim()
 
-  // 短视频（带货类）必须符合 Hook（黄金 3 秒）+ Content（产品价值）+ CTA（转化引导）
+  // 短视频（带货类）遵循「开头抓人 + 中段卖点/场景 + 结尾转化」。
+  // 尽量通过语义做精准的基础归类，提供给后续 LLM 导演做参考
 
-  // 1. Hook (黄金 3 秒) 一般是第 1 句（甚至前两句）
   if (index === 0) return 'hook'
-  if (index === 1 && total > 3 && !isCtaText(normalized)) return 'hook'
 
-  // 3. CTA (转化引导) 一般是最后 1 句或带有明显引导词的末尾部分
-  if (index === total - 1) return 'cta'
+  if (index === total - 1 && total <= 4) return 'cta'
   if (index >= total - 3 && isCtaText(normalized)) return 'cta'
 
-  // 2. Content (产品价值) 中间绝大部分内容
+  if (isProductText(normalized)) return 'product'
   if (isSceneText(normalized)) return 'scene'
   return 'content'
 }
@@ -105,6 +125,33 @@ export function classifySentenceStages(sentences: Sentence[]): StageSentence[] {
   }))
 }
 
+export function applyVisualStagePlan(sentences: StageSentence[]): StageSentence[] {
+  // 根据用户强烈要求的强编排结构进行视频轨道排布：
+  // 1高光 + 2场景实战 + 3产品展示 + 4场景实战 + 5细节展示 + 6场景实战 + 7尾部CTA
+  const planned = sentences.map((sentence) => ({ ...sentence }))
+  const len = planned.length
+  
+  if (len === 0) return planned
+  
+  // 1. 强制第一句为 hook，最后一句一定是 cta
+  planned[0].stage = 'hook'
+  if (len > 1) planned[len - 1].stage = 'cta'
+  
+  // 2. 依次填充中间的结构
+  if (len > 2) planned[1].stage = 'scene'
+  if (len > 3) planned[2].stage = 'product'
+  if (len > 4) planned[3].stage = 'scene'
+  if (len > 5) planned[4].stage = 'detail'
+  if (len > 6) planned[5].stage = 'scene'
+  
+  // 3. 处理超出7句以上的中间部分（循环交替）
+  for (let i = 6; i < len - 1; i++) {
+    planned[i].stage = i % 2 === 0 ? 'product' : 'scene'
+  }
+  
+  return planned
+}
+
 export function inferCandidateStageHints(candidate: CandidateClip): SegmentStage[] {
   const searchable = `${candidate.description} ${candidate.tags.join(' ')}`.toLowerCase()
   const hints = new Set<SegmentStage>()
@@ -115,8 +162,23 @@ export function inferCandidateStageHints(candidate: CandidateClip): SegmentStage
     }
   })
 
+  if (hints.has('detail')) {
+    hints.add('product')
+    hints.delete('content')
+  }
+  if (hints.has('result')) hints.add('product')
+
   if (hints.size === 0) hints.add('content')
-  return [...hints]
+
+  if (hints.has('detail')) {
+    return (['detail', 'product'] as SegmentStage[]).filter((stage) => hints.has(stage))
+  }
+  if (hints.has('result')) {
+    return (['product', 'result', 'cta'] as SegmentStage[]).filter((stage) => hints.has(stage))
+  }
+
+  const orderedStages: SegmentStage[] = ['hook', 'product', 'content', 'scene', 'cta']
+  return orderedStages.filter((stage) => hints.has(stage))
 }
 
 // 匹配分值
@@ -135,16 +197,39 @@ function getStageMatchScore(sentenceStage: SegmentStage, candidateHints: Segment
       if (hasContent) return -40 // 产品细节绝不能做开头
       return -50
     case 'content':
-      // Content（产品价值）占比最大，优先匹配 content 素材
+      // Content 是中段宽泛卖点，优先产品展示/细节，其次通用 content。
+      if (candidateHints.includes('detail')) return 58
+      if (candidateHints.includes('product')) return 56
       if (hasContent) return 55
+      if (candidateHints.includes('result')) return 16
       if (hasHook || hasScene || hasCta) return -35
       return -10
+    case 'product':
+      if (candidateHints.includes('product')) return 65
+      if (candidateHints.includes('detail')) return 52
+      if (hasContent) return 24
+      if (candidateHints.includes('result')) return 18
+      if (hasHook || hasScene || hasCta) return -35
+      return -10
+    case 'detail':
+      if (candidateHints.includes('detail')) return 72
+      if (candidateHints.includes('product')) return 36
+      if (hasContent) return 20
+      return -35
     case 'scene':
       if (hasSameStage) return 45
+      if (candidateHints.includes('product') || candidateHints.includes('detail')) return -8
       if (hasContent) return 0
+      return -30
+    case 'result':
+      if (candidateHints.includes('result')) return 60
+      if (candidateHints.includes('product')) return 28
+      if (hasContent) return 6
       return -30
     case 'cta':
       if (hasSameStage) return 45
+      if (candidateHints.includes('result')) return 30
+      if (candidateHints.includes('product')) return 18
       if (hasContent) return 0
       return -30
   }
@@ -154,6 +239,58 @@ export function extractKeywords(text: string): string[] {
   const chinese = text.match(/[\u4e00-\u9fa5]{2,}/g) || []
   const english = text.match(/[a-zA-Z]{3,}/g) || []
   return [...chinese, ...english]
+}
+
+export function buildLlmCandidateKeywordPool(
+  sentences: Sentence[],
+  productInfo?: ProductInfo,
+): Set<string> {
+  const allKeywords = new Set<string>()
+  for (const sentence of sentences) {
+    extractKeywords(sentence.text).forEach((keyword) => allKeywords.add(keyword))
+  }
+
+  extractKeywords(
+    [
+      productInfo?.name || '',
+      productInfo?.features || '',
+      productInfo?.highlights || '',
+      productInfo?.targetAudience || '',
+    ].join(' '),
+  ).forEach((keyword) => allKeywords.add(keyword))
+
+  ;['核心', '瞬间', '特写', '细节', '场景', '户外', '展示', '体验', '产品', '效果', '结果'].forEach((keyword) =>
+    allKeywords.add(keyword),
+  )
+
+  return allKeywords
+}
+
+export function scoreCandidateForLlmPool(
+  candidate: Pick<CandidateClip, 'description' | 'tags' | 'colors'>,
+  allKeywords: Set<string>,
+): number {
+  const searchable = `${candidate.description || ''} ${candidate.tags.join(' ')} ${candidate.colors.join(' ')}`.toLowerCase()
+  let relevance = 0
+
+  allKeywords.forEach((keyword) => {
+    if (searchable.includes(keyword.toLowerCase())) relevance += 3
+  })
+
+  const hints = inferCandidateStageHints({
+    videoPath: '',
+    timestamp: 0,
+    description: candidate.description,
+    tags: candidate.tags,
+    colors: candidate.colors,
+    relevance: 0,
+  })
+
+  if (hints.includes('product')) relevance += 10
+  if (hints.includes('detail')) relevance += 12
+  if (hints.includes('result')) relevance += 8
+
+  return relevance
 }
 
 export function rankCandidatesForSentence(
@@ -171,7 +308,7 @@ export function rankCandidatesForSentence(
 
   return candidates
     .map((candidate, index) => {
-      const searchable = `${candidate.description} ${candidate.tags.join(' ')}`.toLowerCase()
+      const searchable = `${candidate.description} ${candidate.tags.join(' ')} ${candidate.colors.join(' ')}`.toLowerCase()
       let score = candidate.relevance
 
       const stageHints = inferCandidateStageHints(candidate)

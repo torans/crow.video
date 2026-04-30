@@ -88,5 +88,6 @@ export interface VideoFrameAnalysisRecord {
   colors: string
   tags: string
   appeal: number
+  analyzed_prompt_version: number
   analyzed_at: number
 }

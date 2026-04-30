@@ -3,10 +3,12 @@ import axios from 'axios'
 import { spawn } from 'child_process'
 import { sqQuery } from '../sqlite/index.ts'
 import {
+  applyVisualStagePlan,
   assembleSegments,
+  buildLlmCandidateKeywordPool,
   classifySentenceStages,
-  extractKeywords,
   inferCandidateStageHints,
+  scoreCandidateForLlmPool,
   type CandidateClip,
   type ProductInfo,
   type RankedSentenceSelection,
@@ -67,6 +69,7 @@ function parseAssTime(ts: string): number {
 export async function fetchTopKCandidates(
   sentences: Sentence[],
   videoAssets: string[],
+  productInfo?: ProductInfo,
   k: number = 80,
 ): Promise<CandidateClip[]> {
   if (videoAssets.length === 0) return []
@@ -80,36 +83,55 @@ export async function fetchTopKCandidates(
 
   if (records.length === 0) return []
 
-  const allKeywords = new Set<string>()
-  for (const sentence of sentences) {
-    extractKeywords(sentence.text).forEach((keyword) => allKeywords.add(keyword))
-  }
-  ;['抛投', '瞬间', '特写', '细节', '场景', '户外', '展示', '上鱼'].forEach((keyword) =>
-    allKeywords.add(keyword),
-  )
+  const allKeywords = buildLlmCandidateKeywordPool(sentences, productInfo)
 
   const scored = records.map((record) => {
     let tags: string[] = []
+    let colors: string[] = []
     try {
       tags = JSON.parse(record.tags || '[]')
+      colors = JSON.parse(record.colors || '[]')
     } catch {}
-    const searchable = `${record.description || ''} ${tags.join(' ')}`.toLowerCase()
-    let relevance = 0
-
-    allKeywords.forEach((keyword) => {
-      if (searchable.includes(keyword.toLowerCase())) relevance += 3
-    })
+    const relevance = scoreCandidateForLlmPool(
+      {
+        description: record.description || '',
+        tags,
+        colors,
+      },
+      allKeywords,
+    )
 
     return {
       videoPath: record.video_path,
       timestamp: Number.parseFloat(String(record.timestamp)) || 0,
       description: record.description || '',
       tags,
+      colors,
       relevance,
     }
   })
 
-  return scored.sort((a, b) => b.relevance - a.relevance).slice(0, k)
+  const sorted = scored.sort((a, b) => b.relevance - a.relevance)
+  const overallQuota = Math.max(20, Math.floor(k * 0.7))
+  const productQuota = Math.max(12, Math.floor(k * 0.3))
+
+  const merged = sorted.slice(0, overallQuota)
+  const seen = new Set(merged.map((candidate) => `${candidate.videoPath}@${candidate.timestamp}`))
+
+  for (const candidate of sorted) {
+    if (merged.length >= k || productQuota <= 0) break
+    const hints = inferCandidateStageHints(candidate)
+    const isProductish =
+      hints.includes('product') || hints.includes('detail') || hints.includes('result')
+    if (!isProductish) continue
+
+    const key = `${candidate.videoPath}@${candidate.timestamp}`
+    if (seen.has(key)) continue
+    seen.add(key)
+    merged.push(candidate)
+  }
+
+  return merged.slice(0, k)
 }
 
 function buildStageAwareCandidateList(
@@ -132,8 +154,7 @@ function buildCandidatePrompt(candidates: CandidateClip[]): string {
   return candidates
     .map((candidate, index) => {
       const available = (candidate.availableDuration || 0).toFixed(2)
-      const dur = (candidate.videoDur || 0).toFixed(2)
-      return `[ID: ${index}] stageHints=[${inferCandidateStageHints(candidate).join(', ')}] available=${available}s total=${dur}s ts=${candidate.timestamp.toFixed(2)}s 描述="${candidate.description}" 标签=[${candidate.tags.join(', ')}]`
+      return `[ID: ${index}] stageHints=[${inferCandidateStageHints(candidate).join(', ')}] available=${available}s ts=${candidate.timestamp.toFixed(2)}s 颜色=[${candidate.colors.join(', ')}] 描述="${candidate.description}" 标签=[${candidate.tags.join(', ')}]`
     })
     .join('\n')
 }
@@ -148,7 +169,7 @@ function buildSentencePrompt(sentences: StageSentence[]): string {
 }
 
 function isStage(value: unknown): value is RankedSentenceSelection['stage'] {
-  return value === 'hook' || value === 'content' || value === 'scene' || value === 'cta'
+  return value === 'hook' || value === 'content' || value === 'product' || value === 'detail' || value === 'scene' || value === 'result' || value === 'cta'
 }
 
 function dedupeIndices(indices: number[]): number[] {
@@ -167,22 +188,34 @@ export async function callLLMMatch(
   const candidateList = buildCandidatePrompt(candidates)
   const sentenceList = buildSentencePrompt(sentences)
 
-  const systemPrompt = `你是一位短视频剪辑导演。必须严格遵守 Hook → Content → CTA 三段式结构：
-1. hook（黄金3秒）：
-   - 【最高优先级】必须选择动态冲击、特写、爆发力的镜头（如：抛投瞬间、快速动作、视觉冲击画面）。
-   - 【绝对禁止】开头不能用产品参数、静态细节、文字说明类素材。
-   - 如果候选中有 stageHints 包含 "hook" 的素材，必须优先使用。
-2. content（产品价值，占比最大）：展示产品参数、细节、质感或性能价值。
-3. scene：展示真实使用场景/情境代入。
-4. cta：展示成果、产品全貌或收尾转化镜头。
+  const systemPrompt = `你是一位短视频剪辑导演，正在为 20-30 秒带货视频编排镜头。你的任务不是只做“语义相似匹配”，而是要在句子语义正确的前提下，尽量满足短视频镜头结构。
 
-硬约束：
-- hook 阶段的候选排序中，绝不能把 stageHints=["content"] 的素材排在前面。
-- 先保证 stage 匹配，再考虑丰富度。
+镜头结构目标：
+1. 开头 1-2 个镜头必须优先选择 hook/吸睛素材，禁止把纯静态参数或纯细节素材放在最前面。
+2. 中段优先让场景(scene) 与 产品展示(product/detail)交替推进，避免连续多个纯场景或连续多个纯产品空镜。
+3. 产品展示相关镜头（product、detail、result）应明显占比较高，至少接近全片 1/3。
+4. 全片至少需要有一个 detail 候选排在前面，用来支撑产品细节展示。
+5. 结尾优先 result / cta / product，用于结果强化和下单转化。
+
+候选素材中的 stageHints 含义：
+- hook: 强视觉冲击、强动作、结果预览
+- product: 产品整体展示、主体明确
+- detail: 产品近景、材质、接口、纹理、做工
+- scene: 真实使用场景、实战、演示
+- result: 前后对比、效果反馈、结果展示
+- cta: 收尾、展示全貌、适合转化
+- content: 泛化中段卖点素材
+
+排序规则：
+- 先保证当前句子的语义和 stage 合适，再考虑丰富度和交替节奏。
+- 对 content 句，优先 product/detail，其次 content，再次 result。
+- 对 scene 句，优先 scene；product/detail 只能作为次选。
+- 对 cta 句，优先 result/cta/product。
 - 优先选择 availableDuration 足够覆盖该句时长的候选。
 - 可以推荐多个备选，供剪辑系统做去重和补时长。
-- 返回纯 JSON 数组，每项必须包含：
-  {"stage":"hook|content|scene|cta","primarySegmentIndex":number,"backupSegmentIndices":[number,...],"reason":"简短原因"}`
+
+返回纯 JSON 数组，每项必须包含：
+{"stage":"hook|content|product|detail|scene|result|cta","primarySegmentIndex":number,"backupSegmentIndices":[number,...],"reason":"简短原因"}`
 
   const userPrompt = `产品信息：${JSON.stringify(productInfo || {})}
 字幕句子：
@@ -271,8 +304,8 @@ export async function matchVideoSegmentsByLLM(params: {
 }) {
   const { subtitleFile, videoAssets, productInfo, targetDuration, llmConfig } = params
 
-  const sentences = classifySentenceStages(parseAssSentences(subtitleFile))
-  const baseCandidates = await fetchTopKCandidates(sentences, videoAssets, 80)
+  const sentences = applyVisualStagePlan(classifySentenceStages(parseAssSentences(subtitleFile)))
+  const baseCandidates = await fetchTopKCandidates(sentences, videoAssets, productInfo, 80)
 
   const uniqueVideos = [...new Set(baseCandidates.map((candidate) => candidate.videoPath))]
   const videoDurations = new Map<string, number>()

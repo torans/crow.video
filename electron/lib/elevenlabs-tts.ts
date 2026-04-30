@@ -60,6 +60,29 @@ export interface SynthesisResult {
   ): string
 }
 
+export function supportsTimestamps(modelId?: string): boolean {
+  if (!modelId) return true
+  return modelId !== 'eleven_v3'
+}
+
+function containsChineseCharacters(chars?: string[]): boolean {
+  return !!chars?.some((char) => /[\u4e00-\u9fff]/.test(char))
+}
+
+export function pickPreferredAlignment(
+  alignment?: CharacterAlignment,
+  normalizedAlignment?: CharacterAlignment,
+): CharacterAlignment | undefined {
+  if (!alignment) return normalizedAlignment
+  if (!normalizedAlignment) return alignment
+
+  const alignmentHasChinese = containsChineseCharacters(alignment.characters)
+  const normalizedHasChinese = containsChineseCharacters(normalizedAlignment.characters)
+
+  if (alignmentHasChinese && !normalizedHasChinese) return alignment
+  return normalizedAlignment
+}
+
 interface CharacterAlignment {
   characters: string[]
   character_start_times_seconds?: number[]
@@ -146,7 +169,7 @@ ScriptType: v4.00+
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,5,10,10,10,1
+Style: Default,Arial,${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,5,60,60,60,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -188,7 +211,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       buffer += char
       lastEndMs = end
 
-      if (/[。！？!?；;,\n]/.test(char) || buffer.length >= 26) {
+      if (/[。！？!?；;,\n]/.test(char) || buffer.length >= 14) {
         flush()
       }
     }
@@ -320,7 +343,7 @@ export class ElevenLabsTTS {
           normalized_alignment?: CharacterAlignment
         }
         audioBuffer = Buffer.from(data.audio_base64, 'base64')
-        alignment = data.normalized_alignment ?? data.alignment
+        alignment = pickPreferredAlignment(data.alignment, data.normalized_alignment)
       } else {
         audioBuffer = Buffer.from(response.data)
       }
@@ -332,8 +355,22 @@ export class ElevenLabsTTS {
           let detail = ''
           try {
             // data 可能是 Buffer（arraybuffer 响应），也可能是已解析的对象
-            const text = Buffer.isBuffer(data) ? data.toString('utf-8') : String(data)
-            detail = JSON.parse(text)?.detail ?? text
+            if (Buffer.isBuffer(data)) {
+              const text = data.toString('utf-8')
+              const parsed = JSON.parse(text)
+              detail =
+                typeof parsed?.detail === 'string'
+                  ? parsed.detail
+                  : JSON.stringify(parsed?.detail ?? parsed)
+            } else if (typeof data === 'object' && data !== null) {
+              const objectData = data as Record<string, unknown>
+              detail =
+                typeof objectData.detail === 'string'
+                  ? objectData.detail
+                  : JSON.stringify(objectData.detail ?? objectData)
+            } else {
+              detail = String(data)
+            }
           } catch {
             detail = Buffer.isBuffer(data) ? data.toString('utf-8') : String(data)
           }

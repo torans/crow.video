@@ -1,9 +1,11 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import {
+  applyVisualStagePlan,
   assembleSegments,
   classifySentenceStages,
   detectSentenceStage,
+  inferCandidateStageHints,
   rankCandidatesForSentence,
   type CandidateClip,
 } from './llm-match-core.ts'
@@ -23,6 +25,19 @@ test('classifySentenceStages creates scene in mid-late sentences', () => {
     { text: '现在安排一盘就够了', start: 8, end: 10 },
   ])
   assert.deepEqual(stages.map((item) => item.stage), ['hook', 'content', 'scene', 'cta'])
+})
+
+test('applyVisualStagePlan reserves product detail and result coverage', () => {
+  const staged = applyVisualStagePlan([
+    { text: '先看最狠的一下', start: 0, end: 2, stage: 'hook', index: 0 },
+    { text: '平时出门带着也不占地方', start: 2, end: 4, stage: 'content', index: 1 },
+    { text: '杯身拿在手里轻很多', start: 4, end: 6, stage: 'content', index: 2 },
+    { text: '接口和刀头细节也看得见', start: 6, end: 8, stage: 'content', index: 3 },
+    { text: '榨出来更细腻，喝着更顺', start: 8, end: 10, stage: 'content', index: 4 },
+    { text: '现在下单更划算', start: 10, end: 12, stage: 'cta', index: 5 },
+  ])
+
+  assert.deepEqual(staged.map((item) => item.stage), ['hook', 'product', 'scene', 'detail', 'result', 'cta'])
 })
 
 test('rankCandidatesForSentence favors stage and duration fit', () => {
@@ -77,6 +92,60 @@ test('rankCandidatesForSentence strongly prefers content clips for content sente
         relevance: 5,
         videoDur: 6,
         availableDuration: 4,
+      },
+    ] satisfies CandidateClip[],
+    new Set<string>(),
+  )
+
+  assert.equal(ranked[0], 1)
+})
+
+test('inferCandidateStageHints distinguishes detail product and result shots', () => {
+  assert.deepEqual(
+    inferCandidateStageHints({
+      videoPath: 'detail.mp4',
+      timestamp: 0,
+      description: '产品细节特写，展示按键做工和接口材质',
+      tags: ['细节', '特写', '产品'],
+      relevance: 1,
+    }),
+    ['detail', 'product'],
+  )
+
+  assert.deepEqual(
+    inferCandidateStageHints({
+      videoPath: 'result.mp4',
+      timestamp: 0,
+      description: '使用后前后对比结果展示，效果一眼可见',
+      tags: ['效果', '展示', '结果'],
+      relevance: 1,
+    }),
+    ['product', 'result'],
+  )
+})
+
+test('rankCandidatesForSentence prefers detail clip for detail sentence', () => {
+  const sentence = { text: '近距离看下接口和边角做工细节', start: 3, end: 5, stage: 'detail' as const, index: 2 }
+  const ranked = rankCandidatesForSentence(
+    sentence,
+    [
+      {
+        videoPath: 'scenario.mp4',
+        timestamp: 0,
+        description: '用户在厨房里真实使用产品',
+        tags: ['厨房', '使用', '场景'],
+        relevance: 8,
+        videoDur: 6,
+        availableDuration: 3,
+      },
+      {
+        videoPath: 'detail.mp4',
+        timestamp: 0,
+        description: '产品细节特写，接口边角和材质清晰可见',
+        tags: ['细节', '特写', '材质'],
+        relevance: 3,
+        videoDur: 6,
+        availableDuration: 3,
       },
     ] satisfies CandidateClip[],
     new Set<string>(),

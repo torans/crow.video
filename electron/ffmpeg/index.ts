@@ -44,7 +44,7 @@ export async function renderVideo(
       path
         .join(
           path.dirname(getTempTtsVoiceFilePath()),
-          path.basename(getTempTtsVoiceFilePath(), '.wav') + '.srt',
+          path.basename(getTempTtsVoiceFilePath(), '.wav') + '.ass',
         )
         .replace(/\\/g, '/')
 

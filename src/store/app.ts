@@ -24,7 +24,7 @@ export const useAppStore = defineStore(
     // 大模型文案生成
     const prompt = ref('无')
     const llmConfig = ref({
-      modelName: 'deepseek-chat',
+      modelName: 'deepseek-v4-flash',
       apiUrl: 'https://api.deepseek.com/v1',
       apiKey: '',
       language: '中文',

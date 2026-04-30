@@ -54,6 +54,7 @@ import type { ListFilesFromFolderRecord } from '~/electron/types'
 import ActionToastEmbed from '@/components/ActionToastEmbed.vue'
 import random from 'random'
 import { formatErrorForCopy } from '@/lib/error-copy'
+import { chooseMatchingStrategy } from '@/lib/video-matching-mode'
 
 const toast = useToast()
 const appStore = useAppStore()
@@ -76,11 +77,12 @@ const buildProductContext = (): string | undefined => {
   if (!product) return undefined
 
   const parts: string[] = []
-  parts.push(`你是一个专业的短视频口播文案撰写人。请严格遵守以下规则：`)
+  parts.push(`你是一个短视频带货文案。请严格遵守以下规则：`)
   parts.push(`1. 只输出口播文案正文，不要输出标题、标签、分段、markdown格式`)
-  parts.push(`2. 文案必须是口语化的，像真人说话一样自然流畅`)
-  parts.push(`3. 字数严格控制在80-150字，适合15-30秒的短视频`)
-  parts.push(`4. 必须突出产品卖点，有吸引力和购买欲`)
+  parts.push(`2. 只能基于下方产品信息合理展开，**绝对禁止编造任何参数**。不写具体尺寸、重量、数值、百分比，用感受型对比代替，如"更细""更轻""顺滑得多""明显更远"。同时不使用市井推销话术（禁止"闭眼冲""安排""打龟""封神"等词汇）`)
+  parts.push(`3. **字数严格控制在80-120字**，超过120字就是不合格。中文语速约3-4字/秒，必须在20-30秒内读完`)
+  parts.push(`4. 每句话要包含可被镜头呈现的具体信息（动作、对比、变化、细节），方便后续选片匹配`)
+  parts.push(`5. 写文案时必须遵循以下镜头结构——前1-2句要支撑高光吸睛画面，中段交替安排场景实战和产品展示描述，至少1句描述产品细节，至少2-4句描述使用场景，结尾自然引导下单，**禁止编造配送时效和效果承诺**（如"明天到""三天见效"）`)
   parts.push(``)
   parts.push(`产品信息：`)
   parts.push(`产品名称：${product.name}`)
@@ -195,26 +197,56 @@ const handleRenderVideo = async () => {
 
     let videoSegments: { videoFiles: string[]; timeRanges: [string, string][] } | null = null
 
+    const matchStrategy = chooseMatchingStrategy({
+      llmSyncEnabled: appStore.renderConfig.llmSyncEnabled,
+      smartMatchEnabled: appStore.smartMatchEnabled,
+      hasCurrentProduct: !!appStore.currentProduct,
+    })
+
     // 尝试智能匹配选片
-    if (appStore.smartMatchEnabled && appStore.currentProduct) {
+    if (matchStrategy !== 'random' && appStore.currentProduct) {
       try {
         let productColors: string[] = []
         let productTags: string[] = []
+        let productSceneTags: string[] = []
         try {
           productColors = JSON.parse(appStore.currentProduct.colors)
         } catch {}
         try {
           productTags = JSON.parse(appStore.currentProduct.tags)
         } catch {}
+        try {
+          productSceneTags = JSON.parse(appStore.currentProduct.scene_tags)
+        } catch {}
 
         if (productColors.length > 0 || productTags.length > 0) {
-          const matched = await window.electron.vlMatchVideoSegments({
-            productColors,
-            productTags,
-            targetDuration: ttsResult.duration,
-            videoPaths: appStore.videoAssets.length > 0 ? appStore.videoAssets : undefined,
-            text, // 传入文案文本用于语义对齐选片
-          })
+          const matched =
+            matchStrategy === 'llm' && ttsResult.subtitlePath
+              ? await window.electron.vlMatchByLLM({
+                  subtitleFile: ttsResult.subtitlePath,
+                  videoAssets: appStore.videoAssets,
+                  targetDuration: ttsResult.duration,
+                  productInfo: {
+                    name: appStore.currentProduct.name,
+                    features: appStore.currentProduct.features,
+                    highlights: appStore.currentProduct.highlights,
+                    targetAudience: appStore.currentProduct.target_audience,
+                  },
+                  llmConfig: {
+                    apiUrl: appStore.llmConfig.apiUrl,
+                    apiKey: appStore.llmConfig.apiKey,
+                    modelName: appStore.llmConfig.modelName,
+                  },
+                })
+              : await window.electron.vlMatchVideoSegments({
+                  productColors,
+                  productTags,
+                  productSceneTags,
+                  targetDuration: ttsResult.duration,
+                  videoPaths: appStore.videoAssets.length > 0 ? appStore.videoAssets : undefined,
+                  text,
+                  matchMode: appStore.renderConfig.matchMode,
+                })
           // 只在匹配到足够片段时使用智能匹配结果
           if (matched.videoFiles.length > 0) {
             // 计算匹配到的总时长
@@ -225,12 +257,12 @@ const handleRenderVideo = async () => {
             // 如果匹配时长 >= 目标的 80%，直接使用；否则回退到随机
             if (matchedDuration >= ttsResult.duration * 0.8) {
               videoSegments = matched
-              console.log('使用智能匹配选片，匹配时长:', matchedDuration)
+              console.log(`使用${matchStrategy === 'llm' ? 'LLM语义' : '智能'}匹配选片，匹配时长:`, matchedDuration)
             }
           }
         }
       } catch (e) {
-        console.warn('智能匹配失败，回退到随机选片:', e)
+        console.warn(`${matchStrategy === 'llm' ? 'LLM语义匹配' : '智能匹配'}失败，回退到随机选片:`, e)
       }
     }
 

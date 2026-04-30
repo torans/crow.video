@@ -10,12 +10,12 @@
             </div>
           </div>
 
-          <div class="text-panel__toolbar">
-            <v-select
-              v-model="appStore.renderConfig.matchMode"
-              :items="[
-                { label: '产品特写', value: 'product' },
-                { label: '爆款场景', value: 'scene' },
+        <div class="text-panel__toolbar">
+          <v-select
+            v-model="appStore.renderConfig.matchMode"
+            :items="[
+                { label: '产品导向', value: 'product' },
+                { label: '场景导向', value: 'scene' },
               ]"
               item-title="label"
               item-value="value"
@@ -23,6 +23,7 @@
               hide-details
               variant="outlined"
               style="min-width: 100px"
+              title="影响文案侧重点，并同步影响智能选片倾向"
             />
             <v-select
               v-model="appStore.llmConfig.language"
@@ -153,6 +154,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { generateText, streamText } from 'ai'
 import { useToast } from 'vue-toastification'
 import { useTranslation } from 'i18next-vue'
+import { buildScriptSystemPrompt } from '@/lib/script-prompt'
 
 const toast = useToast()
 const appStore = useAppStore()
@@ -214,52 +216,11 @@ function sanitizeGeneratedScript(raw: string): string {
 
 const buildSystemPrompt = (productContext?: string): string => {
   if (productContext) return productContext
-  const lang = appStore.llmConfig.language || '中文'
-  const product = appStore.currentProduct
-  const matchMode = appStore.renderConfig.matchMode || 'product'
-
-  const parts: string[] = []
-
-  // 1. 核心人设与字数对标
-  parts.push(`你是一个短视频爆款带货编剧，擅长用最狠、最直接的话术实现高转化。`)
-  parts.push(`【硬性要求】：总字数严格控制在 100-150 字之间。不准罗嗦，每句话都要有含金量。`)
-
-  // 2. 严格的黄金三段式结构 (Hook + Content + CTA)
-  parts.push(`\n【脚本结构指令】（严格遵守以下三段式结构，其中Content占比最大）：
-1. **Hook (黄金3秒)**：第1句。必须一句话封喉。要么抛出惊人事实，要么直接展示产品最硬核的瞬间（如：掰不断、划不破、直接砸）。
-2. **Content (产品价值)**：中间大部分（占比需达到70%）。
-   - ${matchMode === 'product' ? '重点描述“显性卖点”：材质、手感、细节。要让观众觉得这东西很贵、很值。' : '重点描述“使用反差”：没用之前多痛苦，用了之后多爽。强化场景带入感。'}
-   - 多用动词（如：拉、拽、弹、磨），禁止用空洞的形容词。
-3. **CTA (转化引导)**：最后1-2句。别废话，直接给行动指令。比如“看左下角”、“库存不多”、“直接带走”。`)
-
-  // 3. 语感模型：反 AI 模板化
-  parts.push(`\n【语感准则】：
-- 拒绝 AI 腔：禁止出现“想象一下”、“在这个世界”、“探索”、“不仅仅...更是”等废话。
-- 【严禁捏造】：绝不能虚构产品参数（如具体的线号、尺寸、重量、材质等），只能基于下方提供的【当前产品数据】进行扩写。如果信息较少，请侧重于使用体验、效果和购买号召。
-- 风格应当像一个经验丰富、爽快直接的带货主播，语速明快，直戳痛点。`)
-
-  // 4. 动态数据注入
-  if (product) {
-    parts.push(`\n【当前产品数据】：`)
-    parts.push(`- 名称：${product.name}`)
-    if (product.features) parts.push(`- 核心工艺：${product.features}`)
-    if (product.highlights) parts.push(`- 使用效果：${product.highlights}`)
-    if (product.target_audience) parts.push(`- 核心人群：${product.target_audience}`)
-  }
-  parts.push(`\n【最高优先级语言指令】：
-必须将最终生成的口播文案翻译并完全输出为【${lang}】。不管下方提供的产品信息是什么语言，不管上文的结构指令是什么语言，最后输出的成稿必须 100% 使用纯正地道的【${lang}】！`)
-  parts.push(`\n规避极限词。比如极细、最强、第一、顶级等等`)
-  // 5. 输出格式
-  parts.push(
-    `\n【绝对强制的输出格式】：
-- 这是一个要直接喂给语音合成（TTS）的口播稿，必须是**完全纯文本**。
-- 不做任何结构化拆分！不准分点，不准写开头语，不准写类似“Hook:”、“Content:”或“【PE线】”这样的结构化标签。
-- 严禁使用任何 Markdown 符号（如 \`**\`、\`*\`、\`#\`、\`-\`）。
-- 严禁使用换行符分成多段，必须是连贯、自然融合的一整段话。
-- 再次强调：输出的内容要能直接拿去愉快地朗读，请返回总字数严格保持在 100-150 字以内。`,
-  )
-
-  return parts.join('\n')
+  return buildScriptSystemPrompt({
+    language: appStore.llmConfig.language || '中文',
+    product: appStore.currentProduct,
+    matchMode: appStore.renderConfig.matchMode || 'product',
+  })
 }
 
 // ========================

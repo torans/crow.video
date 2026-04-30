@@ -2,7 +2,7 @@ import fs from 'node:fs'
 import path from 'node:path'
 import { spawn } from 'child_process'
 import { EdgeTTS } from '../lib/edge-tts'
-import { ElevenLabsTTS } from '../lib/elevenlabs-tts'
+import { ElevenLabsTTS, supportsTimestamps } from '../lib/elevenlabs-tts'
 import { parseBuffer } from 'music-metadata'
 import {
   EdgeTtsSynthesizeCommonParams,
@@ -118,7 +118,7 @@ export async function edgeTtsSynthesizeToFile(
   let subtitlePath: string | undefined
   if (withCaption) {
     // 使用 ASS 格式（支持字体大小和位置控制），距底部 300px，字体 56
-    const assString = result.getCaptionAssString(80, 300, 1920, 1080)
+    const assString = result.getCaptionAssString(56, 300, 1920, 1080)
     subtitlePath = path.join(path.dirname(outputPath), path.basename(outputPath, '.mp3') + '.ass')
     if (fs.existsSync(subtitlePath)) {
       fs.unlinkSync(subtitlePath)
@@ -164,6 +164,11 @@ export async function elevenLabsTtsSynthesizeToFile(
   params: ElevenLabsTtsSynthesizeToFileParams,
 ): Promise<ElevenLabsTtsSynthesizeToFileResult> {
   const { text, voiceId, options, withCaption } = params
+  if (withCaption && !supportsTimestamps(options?.modelId)) {
+    throw new Error(
+      `当前 ElevenLabs 模型 ${options?.modelId} 不支持时间戳字幕。请改用 eleven_multilingual_v2 或 eleven_flash_v2_5。`,
+    )
+  }
   const result = withCaption
     ? await elevenLabsTts.synthesizeWithTimestamps(text, voiceId, options)
     : await elevenLabsTts.synthesize(text, voiceId, options)
@@ -179,7 +184,7 @@ export async function elevenLabsTtsSynthesizeToFile(
 
   let subtitlePath: string | undefined
   if (withCaption && typeof result.getCaptionAssString === 'function') {
-    const assString = result.getCaptionAssString(80, 300, 1920, 1080)
+    const assString = result.getCaptionAssString(56, 300, 1920, 1080)
     if (assString) {
       subtitlePath = path.join(path.dirname(outputPath), path.basename(outputPath, '.mp3') + '.ass')
       if (fs.existsSync(subtitlePath)) {

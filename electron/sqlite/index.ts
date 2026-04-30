@@ -173,6 +173,7 @@ export const initSqlite = async () => {
         colors TEXT NOT NULL DEFAULT '[]',
         tags TEXT NOT NULL DEFAULT '[]',
         appeal REAL NOT NULL DEFAULT 5,
+        analyzed_prompt_version INTEGER NOT NULL DEFAULT 1,
         analyzed_at INTEGER NOT NULL DEFAULT 0
       )
     `)
@@ -185,6 +186,13 @@ export const initSqlite = async () => {
     // 兼容旧数据：如果 appeal 列不存在则添加
     try {
       db.exec(`ALTER TABLE video_frame_analysis ADD COLUMN appeal REAL NOT NULL DEFAULT 5`)
+    } catch {
+      // 列已存在，忽略
+    }
+
+    // 兼容旧数据：如果 analyzed_prompt_version 列不存在则添加
+    try {
+      db.exec(`ALTER TABLE video_frame_analysis ADD COLUMN analyzed_prompt_version INTEGER NOT NULL DEFAULT 1`)
     } catch {
       // 列已存在，忽略
     }

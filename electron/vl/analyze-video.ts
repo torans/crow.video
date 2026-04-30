@@ -5,6 +5,7 @@ import { app } from 'electron'
 import { executeFFmpeg } from '../ffmpeg'
 import { analyzeImage, FRAME_ANALYSIS_PROMPT } from './index'
 import { sqQuery, sqInsert, sqDelete } from '../sqlite'
+import { FRAME_ANALYSIS_PROMPT_VERSION, shouldRefreshVideoAnalysis } from './analysis-version.ts'
 import type {
   AnalyzeVideoAssetsParams,
   AnalyzeVideoAssetsResult,
@@ -113,14 +114,26 @@ export async function analyzeVideoAssets(
 
     // Check if already analyzed (incremental)
     const existing = await sqQuery({
-      sql: 'SELECT COUNT(*) as count FROM video_frame_analysis WHERE video_path = ?',
+      sql: `SELECT COUNT(*) as count, COALESCE(MIN(analyzed_prompt_version), 0) as analyzed_prompt_version
+            FROM video_frame_analysis
+            WHERE video_path = ?`,
       params: [videoPath],
     })
-    if (existing[0]?.count > 0) {
-      console.log(`[VL分析] 跳过已分析视频 (${existing[0].count} 帧): ${videoPath}`)
+
+    if (!shouldRefreshVideoAnalysis(existing, FRAME_ANALYSIS_PROMPT_VERSION)) {
+      console.log(
+        `[VL分析] 跳过已分析视频 (${existing[0].count} 帧, version=${existing[0].analyzed_prompt_version}): ${videoPath}`,
+      )
       analyzedCount++
       onProgress?.(analyzedCount, videoPaths.length)
       continue
+    }
+
+    if (existing[0]?.count > 0) {
+      console.log(
+        `[VL分析] 检测到旧版本分析结果，准备重跑: ${videoPath} (existingVersion=${existing[0].analyzed_prompt_version}, currentVersion=${FRAME_ANALYSIS_PROMPT_VERSION})`,
+      )
+      await clearVideoAnalysis(videoPath)
     }
 
     // Extract frames
@@ -176,6 +189,7 @@ export async function analyzeVideoAssets(
             colors: JSON.stringify(result.colors),
             tags: JSON.stringify(result.tags),
             appeal: result.appeal,
+            analyzed_prompt_version: FRAME_ANALYSIS_PROMPT_VERSION,
             analyzed_at: Date.now(),
           },
         })

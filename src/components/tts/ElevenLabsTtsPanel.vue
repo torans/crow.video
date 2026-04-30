@@ -146,7 +146,7 @@
 </template>
 
 <script lang="ts" setup>
-import { computed, ref, watch } from 'vue'
+import { computed, onUnmounted, ref, watch } from 'vue'
 import { useTranslation } from 'i18next-vue'
 import { useAppStore } from '@/store'
 
@@ -319,11 +319,15 @@ const avatarGradient = (seed: string) => {
 }
 
 let previewAudio: HTMLAudioElement | null = null
+const stopPreviewAudio = () => {
+  if (!previewAudio) return
+  previewAudio.pause()
+  previewAudio.currentTime = 0
+  previewAudio = null
+}
+
 const playPreview = (url: string) => {
-  if (previewAudio) {
-    previewAudio.pause()
-    previewAudio.currentTime = 0
-  }
+  stopPreviewAudio()
   previewAudio = new Audio(url)
   previewAudio.play()
 }
@@ -339,7 +343,14 @@ watch(voiceDialogOpen, async (open) => {
     } else {
       visibleCount.value = 20
     }
+    return
   }
+
+  stopPreviewAudio()
+})
+
+onUnmounted(() => {
+  stopPreviewAudio()
 })
 </script>
 

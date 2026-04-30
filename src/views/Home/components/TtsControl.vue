@@ -58,6 +58,9 @@
           <div class="tts-config-dialog__section-title">
             {{ t('features.tts.config.model') }}
           </div>
+          <div class="tts-config-dialog__hint">
+            {{ t('features.tts.config.subtitleCompatibilityHint') }}
+          </div>
           <div class="tts-model-list">
             <button
               v-for="model in modelItems"
@@ -102,6 +105,8 @@ import ActionToastEmbed from '@/components/ActionToastEmbed.vue'
 import { formatErrorForCopy } from '@/lib/error-copy'
 import ElevenLabsTtsPanel from '@/components/tts/ElevenLabsTtsPanel.vue'
 
+const elevenLabsCaptionUnsupportedModels = new Set(['eleven_v3'])
+
 const toast = useToast()
 const appStore = useAppStore()
 const { t, i18next } = useTranslation()
@@ -126,9 +131,9 @@ const modelItems = computed(() => [
   {
     label: 'Eleven v3',
     value: 'eleven_v3',
-    badge: '',
+    badge: t('features.tts.config.modelBadgeSubtitleUnsupported'),
     description: t('features.tts.config.modelElevenV3Desc'),
-    tags: ['70+ 语言', '表现力强', '更适合精细调优'],
+    tags: ['70+ 语言', '表现力强', '仅试听/纯音频'],
   },
   {
     label: 'Eleven Multilingual v2',
@@ -283,6 +288,15 @@ onUnmounted(() => {
 const synthesizedSpeechToFile = async (option: { text: string; withCaption?: boolean }) => {
   if (!configValid()) throw new Error(t('features.tts.errors.configInvalid') as string)
 
+  if (
+    option?.withCaption &&
+    elevenLabsCaptionUnsupportedModels.has(appStore.ttsConfig.elevenlabsModelId)
+  ) {
+    throw new Error(
+      '当前 ElevenLabs 模型不支持时间戳字幕，请改用 Eleven Multilingual v2 或 Eleven Flash v2.5。',
+    )
+  }
+
   try {
     const result = await window.electron.elevenlabsTtsSynthesizeToFile({
       text: option.text,
@@ -337,6 +351,13 @@ defineExpose({ synthesizedSpeechToFile })
   display: flex;
   flex-direction: column;
   gap: 10px;
+}
+
+.tts-config-dialog__hint {
+  margin-bottom: 12px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: rgba(255, 255, 255, 0.72);
 }
 
 .tts-panel__actions {

@@ -400,7 +400,7 @@ ScriptType: v4.00+
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,5,10,10,10,1
+Style: Default,Arial,${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,5,60,60,60,1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -447,7 +447,10 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         word.Offset - (this.wordList[index - 1].Offset + this.wordList[index - 1].Duration) >
         100 * 10 ** 4
 
-      if (index !== 0 && vocieGap()) {
+      const sentenceLen = currentSentence.reduce((sum, w) => sum + w.text.Text.length, 0)
+      const wordLen = word.text.Text.length
+
+      if (index !== 0 && (vocieGap() || sentenceLen + wordLen > 14)) {
         flushSentence()
         currentSentence = [word]
         return
