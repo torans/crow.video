@@ -71,28 +71,7 @@ const trackStat = (title: string) => {
   window.electron.statTrack(buildStatPayload(title)).catch(() => {})
 }
 
-// 构建产品上下文，用于注入 LLM prompt
-const buildProductContext = (): string | undefined => {
-  const product = appStore.currentProduct
-  if (!product) return undefined
 
-  const parts: string[] = []
-  parts.push(`你是一个短视频带货文案。请严格遵守以下规则：`)
-  parts.push(`1. 只输出口播文案正文，不要输出标题、标签、分段、markdown格式`)
-  parts.push(`2. 只能基于下方产品信息合理展开，**绝对禁止编造任何参数**。不写具体尺寸、重量、数值、百分比，用感受型对比代替，如"更细""更轻""顺滑得多""明显更远"。同时不使用市井推销话术（禁止"闭眼冲""安排""打龟""封神"等词汇）`)
-  parts.push(`3. **字数严格控制在80-120字**，超过120字就是不合格。中文语速约3-4字/秒，必须在20-30秒内读完`)
-  parts.push(`4. 每句话要包含可被镜头呈现的具体信息（动作、对比、变化、细节），方便后续选片匹配`)
-  parts.push(`5. 写文案时必须遵循以下镜头结构——前1-2句要支撑高光吸睛画面，中段交替安排场景实战和产品展示描述，至少1句描述产品细节，至少2-4句描述使用场景，结尾自然引导下单，**禁止编造配送时效和效果承诺**（如"明天到""三天见效"）`)
-  parts.push(``)
-  parts.push(`产品信息：`)
-  parts.push(`产品名称：${product.name}`)
-  if (product.features) parts.push(`核心功能：${product.features}`)
-  if (product.highlights) parts.push(`产品亮点：${product.highlights}`)
-  if (product.target_audience) parts.push(`目标受众：${product.target_audience}`)
-  if (product.description) parts.push(`产品外观：${product.description}`)
-
-  return parts.join('\n')
-}
 
 // 渲染合成视频
 const TextGenerateInstance = ref<InstanceType<typeof TextGenerate> | null>()
@@ -159,9 +138,7 @@ const handleRenderVideo = async () => {
     appStore.updateRenderStatus(RenderStatus.GenerateText)
     const text =
       TextGenerateInstance.value?.getCurrentOutputText() ||
-      (await TextGenerateInstance.value?.handleGenerate({
-        productContext: buildProductContext(),
-      }))!
+      (await TextGenerateInstance.value?.handleGenerate())!
 
     // TTS合成语音
     // @ts-ignore
