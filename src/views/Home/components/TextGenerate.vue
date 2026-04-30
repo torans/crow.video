@@ -219,7 +219,6 @@ const buildSystemPrompt = (productContext?: string): string => {
   return buildScriptSystemPrompt({
     language: appStore.llmConfig.language || '中文',
     product: appStore.currentProduct,
-    matchMode: appStore.renderConfig.matchMode || 'product',
   })
 }
 

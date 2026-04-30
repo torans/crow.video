@@ -20,6 +20,14 @@
 - [docs/plan-llm-video-match.md](file://docs/plan-llm-video-match.md)
 </cite>
 
+## 更新摘要
+**变更内容**
+- 从三阶段结构（hook → content → cta）升级为七阶段结构（hook → product → content → detail → scene → result → cta）
+- 新增视觉阶段规划系统，实现强制性的七步视频轨道排布
+- 增强评分机制，引入阶段匹配分数和时长适配评分
+- 新增候选片段阶段提示推断系统
+- 完善片段组装和时长分配算法
+
 ## 目录
 1. [简介](#简介)
 2. [项目结构](#项目结构)
@@ -35,11 +43,15 @@
 
 AI视频匹配系统是一个基于人工智能技术的自动化视频生成平台，专为抖店、快手、TikTok等电商平台的带货视频制作而设计。该系统能够实现日产1000+条视频的批量自动化生成，通过AI技术实现从商品分析到视频渲染的全流程自动化。
 
+**重大升级**：系统已从传统的三阶段结构（hook → content → cta）升级为先进的七阶段结构（hook → product → content → detail → scene → result → cta），并新增了视觉阶段规划系统和增强的评分机制。
+
 系统的核心特色包括：
 - **AI口播文案生成**：基于DeepSeek模型生成80-150字的带货脚本
 - **智能视频匹配**：通过颜色、标签、语义三重对齐实现精准素材匹配
 - **语音合成**：支持多种音色的自然语音合成
 - **批量自动化**：支持一键日产1000+条视频的自动化生产
+- **七阶段视觉规划**：强制性的视频轨道排布，确保内容结构完整性
+- **增强评分机制**：基于阶段匹配和时长适配的复合评分系统
 
 ## 项目结构
 
@@ -96,7 +108,7 @@ D --> K
 系统提供两种匹配策略：
 
 - **传统匹配算法**：基于颜色覆盖率、标签相似度和语义权重的混合评分
-- **LLM增强匹配**：利用大型语言模型实现更精准的语义对齐
+- **LLM增强匹配**：利用大型语言模型实现更精准的语义对齐，现已升级为七阶段结构
 
 ### 3. 渲染流水线
 完整的视频渲染流程包括：
@@ -223,7 +235,7 @@ G1[覆盖率<34%] --> I
 
 #### LLM增强匹配算法
 
-LLM算法通过大型语言模型实现更精准的语义对齐：
+**重大升级**：LLM算法通过大型语言模型实现更精准的语义对齐，现已升级为七阶段结构。
 
 ```mermaid
 sequenceDiagram
@@ -240,6 +252,11 @@ L->>M : 返回匹配结果
 M->>M : 组装最终片段
 M->>U : 返回匹配结果
 ```
+
+**新增功能**：
+- **七阶段结构**：hook → product → content → detail → scene → result → cta
+- **视觉阶段规划**：强制性的视频轨道排布
+- **增强评分机制**：基于阶段匹配和时长适配的复合评分
 
 **图表来源**
 - [electron/vl/llm-match.ts:161-241](file://electron/vl/llm-match.ts#L161-L241)
@@ -283,6 +300,83 @@ I2 --> P3
 **章节来源**
 - [electron/ipc.ts:98-352](file://electron/ipc.ts#L98-L352)
 - [src/views/Home/index.vue:196-250](file://src/views/Home/index.vue#L196-L250)
+
+### 七阶段视觉规划系统
+
+**新增功能**：系统现在具备强大的视觉阶段规划能力，确保视频内容结构的完整性。
+
+```mermaid
+flowchart TD
+A[输入字幕句子] --> B[语义阶段分类]
+B --> C[视觉阶段规划]
+C --> D[强制七步排布]
+D --> E[阶段匹配评分]
+E --> F[候选片段筛选]
+F --> G[时长适配优化]
+G --> H[最终片段组装]
+```
+
+**七阶段结构**：
+1. **Hook（开头抓人）**：黄金3秒强视觉冲击
+2. **Product（产品展示）**：产品整体展示和主体明确
+3. **Content（中段卖点）**：泛化中段卖点素材
+4. **Detail（细节展示）**：产品近景、材质、接口、纹理、做工
+5. **Scene（场景实战）**：真实使用场景、实战、演示
+6. **Result（结果展示）**：前后对比、效果反馈、结果展示
+7. **CTA（结尾转化）**：收尾、展示全貌、适合转化
+
+**图表来源**
+- [electron/vl/llm-match-core.ts:128-153](file://electron/vl/llm-match-core.ts#L128-L153)
+- [electron/vl/llm-match-core.ts:41-49](file://electron/vl/llm-match-core.ts#L41-L49)
+
+**章节来源**
+- [electron/vl/llm-match-core.ts:128-153](file://electron/vl/llm-match-core.ts#L128-L153)
+- [electron/vl/llm-match-core.ts:41-49](file://electron/vl/llm-match-core.ts#L41-L49)
+
+### 增强评分机制
+
+**重大升级**：系统引入了基于阶段匹配和时长适配的复合评分机制。
+
+```mermaid
+classDiagram
+class StageMatchScore {
++number hookScore
++number productScore
++number contentScore
++number detailScore
++number sceneScore
++number resultScore
++number ctaScore
+}
+class DurationAdaptationScore {
++number availableDuration
++number requiredDuration
++number timeFitBonus
+}
+class CompositeScore {
++StageMatchScore stageScore
++DurationAdaptationScore durationScore
++number finalScore
++calculateCompositeScore() number
+}
+StageMatchScore --> DurationAdaptationScore : "组合"
+DurationAdaptationScore --> CompositeScore : "组合"
+```
+
+**评分规则**：
+- **Hook阶段**：强视觉冲击优先，最高80分
+- **Product阶段**：产品展示优先，65分基线
+- **Detail阶段**：细节展示优先，72分基线
+- **Scene阶段**：场景实战优先，45分基线
+- **Result阶段**：结果展示优先，60分基线
+- **CTA阶段**：转化引导优先，45分基线
+- **Content阶段**：通用卖点，55分基线
+
+**图表来源**
+- [electron/vl/llm-match-core.ts:185-236](file://electron/vl/llm-match-core.ts#L185-L236)
+
+**章节来源**
+- [electron/vl/llm-match-core.ts:185-236](file://electron/vl/llm-match-core.ts#L185-L236)
 
 ## 依赖关系分析
 
@@ -339,6 +433,11 @@ DE1 --> A1
 - 异步处理大量素材的批处理操作
 - 流式处理音频和视频数据，减少内存占用
 
+### 七阶段结构优化
+- **阶段匹配优化**：通过阶段关键词匹配提高素材选择准确性
+- **时长适配优化**：智能计算片段时长，避免过度裁剪
+- **候选筛选优化**：基于阶段提示的候选片段筛选，减少LLM处理负担
+
 ## 故障排除指南
 
 ### 常见问题及解决方案
@@ -364,17 +463,32 @@ DE1 --> A1
 - 增加系统内存或CPU资源
 - 调整并发处理数量
 
+#### 4. 七阶段结构异常
+**症状**：视频内容结构不符合预期
+**解决方案**：
+- 检查字幕解析是否正确
+- 验证阶段关键词配置
+- 确认候选片段阶段提示推断正常
+
 **章节来源**
 - [electron/vl/index.ts:125-149](file://electron/vl/index.ts#L125-L149)
 - [electron/vl/match.ts:275-679](file://electron/vl/match.ts#L275-L679)
 
 ## 结论
 
-AI视频匹配系统通过先进的AI技术和精心设计的架构，实现了从商品分析到视频渲染的全流程自动化。系统具有以下优势：
+AI视频匹配系统通过先进的AI技术和精心设计的架构，实现了从商品分析到视频渲染的全流程自动化。经过重大升级，系统现已具备以下优势：
 
 1. **高度自动化**：从产品录入到视频导出全程无需人工干预
 2. **智能匹配**：基于AI的精准素材匹配，显著提升视频质量
-3. **高性能**：优化的算法和架构支持大规模批量生产
-4. **易用性强**：直观的用户界面和完善的配置选项
+3. **七阶段结构**：强制性的视频轨道排布，确保内容结构完整性
+4. **增强评分**：基于阶段匹配和时长适配的复合评分系统
+5. **高性能**：优化的算法和架构支持大规模批量生产
+6. **易用性强**：直观的用户界面和完善的配置选项
+
+**重大升级价值**：
+- **结构完整性**：七阶段结构确保视频内容的逻辑连贯性
+- **匹配准确性**：阶段匹配评分显著提升素材选择的准确性
+- **时长适配**：智能时长计算避免片段过度裁剪
+- **扩展性**：模块化的架构便于未来功能扩展
 
 该系统为电商带货视频制作提供了全新的解决方案，能够帮助商家大幅提高视频制作效率和质量，是现代电商运营不可或缺的工具。

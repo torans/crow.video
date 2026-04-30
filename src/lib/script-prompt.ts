@@ -7,7 +7,6 @@ interface ProductPromptContext {
 
 export function buildScriptSystemPrompt(params: {
   language: string
-  matchMode: 'product' | 'scene'
   product?: ProductPromptContext | null
 }): string {
   const { language, product } = params
