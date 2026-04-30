@@ -1,6 +1,7 @@
 import fs from 'node:fs'
 import path from 'node:path'
 import os from 'node:os'
+import axios from 'axios'
 import { sqQuery } from '../sqlite'
 import type {
   MatchVideoSegmentsParams,
@@ -462,7 +463,44 @@ export async function matchVideoSegments(
 
   // === Semantic alignment mode (when text is provided) ===
   if (text && text.trim().length > 0) {
-    const sentences = splitSentences(text, targetDuration)
+    let matchText = text
+    let sentences = splitSentences(text, targetDuration)
+
+    // === 跨语言匹配补丁：非中文文案翻译为中文后再做关键词提取 ===
+    const isNonChinese = sentences.every(s => !/[一-龥]/.test(s.text))
+    if (isNonChinese && sentences.length > 0 && params.llmConfig?.apiKey) {
+      try {
+        const llmConfig = params.llmConfig
+        const translatePrompt = `你是一个翻译专家。请将以下短视频脚本逐句翻译成中文，保持原意。
+返回纯 JSON 数组格式: ["翻译1", "翻译2", ...]
+脚本内容:
+${sentences.map(s => s.text).join('\n')}`
+
+        const transRes = await axios.post(
+          `${llmConfig.apiUrl.replace(/\/+$/, '')}/chat/completions`,
+          {
+            model: llmConfig.modelName,
+            messages: [{ role: 'user', content: translatePrompt }],
+            temperature: 0.3,
+          },
+          { headers: { Authorization: `Bearer ${llmConfig.apiKey}` }, timeout: 15000 }
+        )
+
+        const transContent = transRes.data?.choices?.[0]?.message?.content || ''
+        const transJsonMatch = transContent.match(/\[.*\]/s)
+        if (transJsonMatch) {
+          const translatedTexts = JSON.parse(transJsonMatch[0])
+          matchText = translatedTexts.join('')
+          sentences = sentences.map((s, i) => ({
+            ...s,
+            text: translatedTexts[i] || s.text,
+          }))
+          matchLog('TRANSLATION_DONE', { originalText: text, translatedText: matchText })
+        }
+      } catch (e) {
+        console.error('[matchVideoSegments] 跨语言翻译失败，回退到原文关键词匹配:', e)
+      }
+    }
     matchLog('SEMANTIC_MODE', { sentenceCount: sentences.length, sentences: sentences.map(s => ({
       text: s.text,
       start: s.start,
@@ -573,7 +611,7 @@ export async function matchVideoSegments(
 
     if (currentDuration < targetDuration * 1.2) {
       // Fallback 时用全文本算 semantic，只留 > 0 的帧，确保不相关帧不会混进来
-      const fullKeywords = extractKeywords(text)
+      const fullKeywords = extractKeywords(matchText)
       const fallbackPool = filteredFrames
         .filter(f => {
           const sem = descriptionRelevance(fullKeywords, f.description)

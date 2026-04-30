@@ -51,6 +51,7 @@ export interface MatchVideoSegmentsParams {
   minSegmentDuration?: number // default 2
   maxSegmentDuration?: number // default 15
   matchMode?: 'auto' | 'product' | 'scene' // default 'auto'
+  llmConfig?: VLApiConfig // 可选，用于跨语言翻译对齐
 }
 
 export interface MatchedSegment {

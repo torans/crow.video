@@ -224,6 +224,11 @@ const handleRenderVideo = async () => {
                   videoPaths: appStore.videoAssets.length > 0 ? appStore.videoAssets : undefined,
                   text,
                   matchMode: appStore.renderConfig.matchMode,
+                  llmConfig: appStore.llmConfig.apiKey ? {
+                    apiUrl: appStore.llmConfig.apiUrl,
+                    apiKey: appStore.llmConfig.apiKey,
+                    modelName: appStore.llmConfig.modelName,
+                  } : undefined,
                 })
           // 只在匹配到足够片段时使用智能匹配结果
           if (matched.videoFiles.length > 0) {

@@ -65,7 +65,7 @@ export const useAppStore = defineStore(
       outputFileName: 'crow-video',
       outputFileExt: '.mp4',
       matchMode: 'product' as 'product' | 'scene',
-      llmSyncEnabled: false,
+      llmSyncEnabled: true,
     })
     const autoBatch = ref(false)
     const renderStatus = ref(RenderStatus.None)
