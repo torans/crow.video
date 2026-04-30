@@ -201,6 +201,7 @@ const handleRenderVideo = async () => {
             matchStrategy === 'llm' && ttsResult.subtitlePath
               ? await window.electron.vlMatchByLLM({
                   subtitleFile: ttsResult.subtitlePath,
+                  originalScript: text, // 传递带标签的原始脚本
                   videoAssets: appStore.videoAssets,
                   targetDuration: ttsResult.duration,
                   productInfo: {

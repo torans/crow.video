@@ -595,7 +595,9 @@ export class EdgeTTS {
     voice: string = 'en-US-AnaNeural',
     options: SynthesisOptions = {},
   ): Promise<SynthesisResult> {
-    const cleanedText = removeIncompatibleCharacters(text)
+    // 移除分镜标签 [标签]，避免 TTS 播报
+    const cleanText = text.replace(/\[[^\]]+\]/g, '').trim()
+    const cleanedText = removeIncompatibleCharacters(cleanText)
     const textChunks = splitTextByByteLength(cleanedText, 4096)
 
     if (textChunks.length === 1) {

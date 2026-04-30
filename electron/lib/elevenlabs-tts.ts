@@ -294,7 +294,9 @@ export class ElevenLabsTTS {
       throw new Error('ElevenLabs API key is not set. Please call setApiKey first.')
     }
 
-    if (!text || text.trim().length === 0) {
+    // 移除分镜标签 [标签]，避免 TTS 播报
+    const cleanText = text.replace(/\[[^\]]+\]/g, '').trim()
+    if (!cleanText) {
       throw new Error('Text cannot be empty.')
     }
 
@@ -303,7 +305,7 @@ export class ElevenLabsTTS {
     }
 
     const requestBody: Record<string, unknown> = {
-      text,
+      text: cleanText,
       model_id: options.modelId ?? 'eleven_v2',
       voice_settings: {
         stability: options.stability ?? 0.5,

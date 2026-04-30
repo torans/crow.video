@@ -41,9 +41,9 @@ export interface ProductInfo {
 const STAGE_KEYWORDS: Record<SegmentStage, string[]> = {
   hook: ['吸睛', '瞬间', '动态', '冲击', '爆发', '反差', '对比', '预览', '高光', '关键', '根本', '核心', '认知'],
   content: ['参数', '数据', '顺滑', '体验', '性能', '材质', '工艺', '韧性', '耐磨', '做工', '精度', '重量', '密度'],
-  product: ['产品', '整体', '全貌', '主体', '轮廓', '外观'],
-  detail: ['细节', '特写', '接口', '纹理', '做工', '材质', '表面', '边缘', '厚度'],
-  scene: ['场景', '户外', '实战', '使用', '演示', '操作', '测试', '环境', '现场', '水面', '路面', '场地'],
+  product: ['产品', '整体', '全貌', '主体', '轮廓', '外观', '鱼线', 'PE线', '鱼竿', '渔轮', '线杯', '路亚'],
+  detail: ['细节', '特写', '接口', '纹理', '做工', '材质', '表面', '边缘', '厚度', '线径', '编织', '涂层', '结节'],
+  scene: ['场景', '户外', '实战', '使用', '演示', '操作', '测试', '环境', '现场', '水面', '路面', '场地', '抛投', '中鱼', '拉力'],
   result: ['效果', '结果', '对比', '改善', '变化', '反馈', '稳定', '持久'],
   cta: ['转化', '尝试', '体验', '现在', '习惯', '记住', '值得', '试试'],
 }
@@ -269,14 +269,47 @@ export function buildLlmCandidateKeywordPool(
 export function scoreCandidateForLlmPool(
   candidate: Pick<CandidateClip, 'description' | 'tags' | 'colors'>,
   allKeywords: Set<string>,
+  productInfo?: ProductInfo,
 ): number {
   const searchable = `${candidate.description || ''} ${candidate.tags.join(' ')} ${candidate.colors.join(' ')}`.toLowerCase()
   let relevance = 0
 
+  // 1. 基础关键词匹配
   allKeywords.forEach((keyword) => {
     if (searchable.includes(keyword.toLowerCase())) relevance += 3
   })
 
+  // 2. 产品名称与颜色强匹配 (核心逻辑)
+  const COLOR_KEYWORDS = ['红', '蓝', '绿', '黑', '白', '黄', '橙', '紫', '金', '银', '青']
+  
+  if (productInfo?.name || productInfo?.description) {
+    const fullProductText = `${productInfo.name || ''} ${productInfo.description || ''}`.toLowerCase()
+    const productName = (productInfo.name || '').toLowerCase()
+    
+    // 2.1 名称匹配
+    if (productName && searchable.includes(productName)) {
+      relevance += 100 
+    } else if (productName) {
+      const subWords = productName.split(/[\s,，、]+/).filter(w => w.length > 1)
+      subWords.forEach(word => {
+        if (searchable.includes(word)) relevance += 40
+      })
+    }
+
+    // 2.2 颜色一致性匹配 (关键！)
+    COLOR_KEYWORDS.forEach(color => {
+      const hasColorInProduct = fullProductText.includes(color)
+      const hasColorInVideo = searchable.includes(color)
+      
+      if (hasColorInProduct && hasColorInVideo) {
+        relevance += 60 // 颜色对齐，大幅加分
+      } else if (hasColorInProduct && !hasColorInVideo && COLOR_KEYWORDS.some(c => c !== color && searchable.includes(c))) {
+        relevance -= 80 // 颜色冲突（产品是蓝的，素材是别的颜色的），大幅扣分
+      }
+    })
+  }
+
+  // 3. 阶段意图加成
   const hints = inferCandidateStageHints({
     videoPath: '',
     timestamp: 0,

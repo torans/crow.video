@@ -14,6 +14,7 @@ import {
   type RankedSentenceSelection,
   type Sentence,
   type StageSentence,
+  type SegmentStage,
 } from './llm-match-core.ts'
 
 const VITE_DEV_SERVER_URL = process.env['VITE_DEV_SERVER_URL']
@@ -99,6 +100,7 @@ export async function fetchTopKCandidates(
         colors,
       },
       allKeywords,
+      productInfo,
     )
 
     return {
@@ -207,6 +209,9 @@ export async function callLLMMatch(
 - content: 泛化中段卖点素材
 
 排序规则：
+- **一致性原则 (最高优先级)**：检查素材描述中的产品特征（如颜色、材质、类型）是否与当前产品信息一致。
+  - **重要：防止环境干扰**。如果产品是蓝色的，素材描述里说“蓝色天空下的黑色鱼线”，即便有“蓝色”二字也属于严重不匹配，必须排除。
+  - 严禁出现“货不对板”：如果产品是鱼线，素材必须是鱼线；如果产品是蓝色，素材的主体必须是蓝色。
 - 先保证当前句子的语义和 stage 合适，再考虑丰富度和交替节奏。
 - 对 content 句，优先 product/detail，其次 content，再次 result。
 - 对 scene 句，优先 scene；product/detail 只能作为次选。
@@ -297,14 +302,41 @@ async function getVideoDuration(videoPath: string): Promise<number> {
 
 export async function matchVideoSegmentsByLLM(params: {
   subtitleFile: string
+  originalScript?: string // 新增：原始带标签的脚本
   videoAssets: string[]
   productInfo?: ProductInfo
   targetDuration?: number
   llmConfig: { apiUrl: string; apiKey: string; modelName: string }
 }) {
-  const { subtitleFile, videoAssets, productInfo, targetDuration, llmConfig } = params
+  const { subtitleFile, originalScript, videoAssets, productInfo, targetDuration, llmConfig } = params
 
-  const sentences = applyVisualStagePlan(classifySentenceStages(parseAssSentences(subtitleFile)))
+  // 1. 解析字幕
+  const assSentences = parseAssSentences(subtitleFile)
+  
+  // 2. 结合原始脚本提取标签
+  let sentences: StageSentence[] = []
+  if (originalScript) {
+    const scriptLines = originalScript.split('\n').filter(line => line.trim())
+    sentences = assSentences.map((sentence, index) => {
+      const scriptLine = scriptLines[index] || ''
+      const tagMatch = scriptLine.match(/\[([^\]]+)\]/)
+      const tag = tagMatch ? tagMatch[1] : ''
+      
+      let stage: SegmentStage = 'content'
+      if (tag.includes('吸睛')) stage = 'hook'
+      else if (tag.includes('场景')) stage = 'scene'
+      else if (tag.includes('产品')) stage = 'product'
+      else if (tag.includes('细节')) stage = 'detail'
+      else if (tag.includes('效果')) stage = 'result'
+      else if (tag.includes('转化')) stage = 'cta'
+      
+      return { ...sentence, index, stage }
+    })
+  } else {
+    // 回退到启发式分类
+    sentences = applyVisualStagePlan(classifySentenceStages(assSentences))
+  }
+
   const baseCandidates = await fetchTopKCandidates(sentences, videoAssets, productInfo, 80)
 
   const uniqueVideos = [...new Set(baseCandidates.map((candidate) => candidate.videoPath))]
