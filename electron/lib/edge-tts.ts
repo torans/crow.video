@@ -400,7 +400,7 @@ ScriptType: v4.00+
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,5,60,60,60,1
+Style: Default,Arial,${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,60,60,${marginFromBottom},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -430,16 +430,16 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         const prevIsCompact = isNoSpaceScript(prevChar)
         const currIsCompact = isNoSpaceScript(currChar)
         return acc + (prevIsCompact && currIsCompact ? '' : ' ') + text
-      }, '')
+      }, '').replace(/[。！？!?；;：:，,、.\n\r\t\"\'\(\)（）【】「」《》]/g, '').trim()
+
+      if (!joinedText) return
 
       const startMs = firstWord.Offset / 10_000
       const endMs = (lastWord.Offset + lastWord.Duration) / 10_000
       const startTs = formatTimestamp(startMs)
       const endTs = formatTimestamp(endMs)
 
-      // \pos(x,y) 定位，\fs 字体大小，\c 填充色(白色)，\3c 描边色(黑色)，\4a 阴影透明度
-      const styledText = `{\\pos(${posX},${posY})\\fs${fontSize}\\c&H00FFFFFF\\3c&H000000\\4a&H00}${joinedText}`
-      dialogueLines.push(`Dialogue: 0,${startTs},${endTs},Default,,0,0,0,,${styledText}`)
+      dialogueLines.push(`Dialogue: 0,${startTs},${endTs},Default,,0,0,0,,${joinedText.replace(/\n/g, '\\N')}`)
     }
 
     this.wordList.forEach((word, index) => {
@@ -453,10 +453,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       if (index !== 0 && (vocieGap() || sentenceLen + wordLen > 14)) {
         flushSentence()
         currentSentence = [word]
-        return
+      } else {
+        currentSentence.push(word)
       }
 
-      currentSentence.push(word)
+      if (/[。！？!?；;：:，,、.\n\r\t\"\'\(\)（）【】「」《》]/.test(word.text.Text)) {
+        flushSentence()
+        currentSentence = []
+      }
     })
 
     if (currentSentence.length) {
@@ -488,7 +492,9 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
         const prevIsCompact = isNoSpaceScript(prevChar)
         const currIsCompact = isNoSpaceScript(currChar)
         return acc + (prevIsCompact && currIsCompact ? '' : ' ') + text
-      }, '')
+      }, '').replace(/[。！？!?；;：:，,、.\n\r\t\"\'\(\)（）【】「」《》]/g, '').trim()
+
+      if (!joinedText) return
 
       srtCaptionList.push({
         type: 'cue',
@@ -508,10 +514,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       if (index !== 0 && vocieGap()) {
         pushSrtNode()
         currentSentence = [word]
-        return
+      } else {
+        currentSentence.push(word)
       }
 
-      currentSentence.push(word)
+      if (/[。！？!?；;：:，,、.\n\r\t\"\'\(\)（）【】「」《》]/.test(word.text.Text)) {
+        pushSrtNode()
+        currentSentence = []
+      }
     })
 
     if (currentSentence.length) {

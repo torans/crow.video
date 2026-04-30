@@ -3,6 +3,7 @@ interface ProductPromptContext {
   features?: string
   highlights?: string
   target_audience?: string
+  description?: string
 }
 
 export function buildScriptSystemPrompt(params: {
@@ -45,18 +46,20 @@ export function buildScriptSystemPrompt(params: {
    - 必须独立成句（以句号、问号或叹号结尾），**限 12 字以内**。
 
 2. **场景实战（第2、4、6句）**：
-   - 重点描述实际使用场景中的变化和效果（例如：使用前后的鲜明对比、解决问题的瞬间、户外的真实体验）。
+   - 必须基于【当前产品数据】中提供的卖点进行合理的场景化，**绝对禁止凭空捏造夸张、脱离实际的测试场景**。
    - **多用动词**：用具体的动作和变化代替形容词。严禁使用“性能优越”“品质保证”等假大空的词汇。
    - 营造“真实感”与“临场感”，让观众觉得产品确实能解决实际问题。
 
 3. **产品/细节展示（第3、5句）**：
-   - 重点描述产品的物理反馈和细节质感（例如：声音、触感、材质特性、结构工艺）。
+   - 重点描述产品的物理反馈和细节质感（结合下方提供的产品外观信息）。
    - **感受型对比**：用直观的感官体验（如“更顺滑”“更轻盈”“更坚韧”）来表达优势。
-   - **严禁编造参数**：不要凭空捏造尺寸、重量、百分比等具体数据，除非产品信息中已提供。
+   - **严禁编造参数与功能**：不要凭空捏造尺寸、重量、百分比，也绝对不要编造产品不具备的神奇功能。
 
-4. **CTA下单引导（第7句及以后）**：
-   - 15 字以内，自然地进行行动号召，激发购买欲望。
-   - 不准承诺不切实际的时效和绝对效果，不要使用老套的电视购物话术。`)
+4. **CTA 下单引导（最后 1 句）**：
+   - 必须极度克制、自然，绝不能像电视购物。像朋友分享好物一样结束。
+   - 【绝对禁令】：绝对不允许出现“现在下单”、“赶紧抢购”、“买回家”、“先拿下一盘试试”、“点击左下角”等老套、生硬的催单词汇！
+   - 建议用“描述拥有后的美好体验”或“一个反问”来作为结尾（例如：“带上它，去挑战下一个大物。”、“你的下一杆，难道不该是它吗？”）。
+   - 字数必须控制在 15 字以内，点到为止。`)
 
   parts.push(`【语感铁律】：
 - 语调必须自然、自信、真诚。拒绝做作的市井叫卖。
@@ -74,6 +77,7 @@ export function buildScriptSystemPrompt(params: {
     if (product.features) parts.push(`- 功能/特点：${product.features}`)
     if (product.highlights) parts.push(`- 使用效果/卖点：${product.highlights}`)
     if (product.target_audience) parts.push(`- 核心人群：${product.target_audience}`)
+    if (product.description) parts.push(`- 产品外观描述：${product.description}`)
   } else {
     parts.push(
       '【提示】：当前未提供具体产品信息，请根据常见的商用场景，编写一段具备普适性的高质量展示/带货文案。',

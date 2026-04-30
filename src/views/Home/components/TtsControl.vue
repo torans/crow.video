@@ -17,9 +17,7 @@
         </div>
 
         <div class="tts-panel__body">
-          <ElevenLabsTtsPanel
-            @language-change="handleElevenlabsLanguageChange"
-          />
+          <ElevenLabsTtsPanel @language-change="handleElevenlabsLanguageChange" />
 
           <div class="tts-panel__listen workbench-editor-surface">
             <v-text-field
@@ -67,7 +65,9 @@
               :key="model.value"
               type="button"
               class="tts-model-card"
-              :class="{ 'tts-model-card--selected': appStore.ttsConfig.elevenlabsModelId === model.value }"
+              :class="{
+                'tts-model-card--selected': appStore.ttsConfig.elevenlabsModelId === model.value,
+              }"
               @click="appStore.ttsConfig.elevenlabsModelId = model.value"
             >
               <div class="tts-model-card__top">
@@ -76,19 +76,27 @@
                   <span v-if="model.badge" class="tts-model-card__badge">{{ model.badge }}</span>
                 </div>
                 <v-icon
-                  :icon="appStore.ttsConfig.elevenlabsModelId === model.value ? 'mdi-check-circle-outline' : 'mdi-radiobox-blank'"
+                  :icon="
+                    appStore.ttsConfig.elevenlabsModelId === model.value
+                      ? 'mdi-check-circle-outline'
+                      : 'mdi-radiobox-blank'
+                  "
                   size="22"
                 ></v-icon>
               </div>
               <div class="tts-model-card__desc">{{ model.description }}</div>
               <div class="tts-model-card__chips">
-                <span v-for="tag in model.tags" :key="tag" class="tts-model-card__chip">{{ tag }}</span>
+                <span v-for="tag in model.tags" :key="tag" class="tts-model-card__chip">{{
+                  tag
+                }}</span>
               </div>
             </button>
           </div>
           <div class="tts-config-dialog__actions">
             <v-spacer></v-spacer>
-            <v-btn variant="text" @click="configDialogOpen = false">{{ t('common.buttons.close') }}</v-btn>
+            <v-btn variant="text" @click="configDialogOpen = false">{{
+              t('common.buttons.close')
+            }}</v-btn>
           </div>
         </v-card-text>
       </v-card>
@@ -128,19 +136,19 @@ defineProps<{
 }>()
 
 const modelItems = computed(() => [
-  {
-    label: 'Eleven v3',
-    value: 'eleven_v3',
-    badge: t('features.tts.config.modelBadgeSubtitleUnsupported'),
-    description: t('features.tts.config.modelElevenV3Desc'),
-    tags: ['70+ 语言', '表现力强', '仅试听/纯音频'],
-  },
+  // {
+  //   label: 'Eleven v3',
+  //   value: 'eleven_v3',
+  //   badge: t('features.tts.config.modelBadgeSubtitleUnsupported'),
+  //   description: t('features.tts.config.modelElevenV3Desc'),
+  //   tags: ['70+ 语言', '表现力强', '仅试听/纯音频'],
+  // },
   {
     label: 'Eleven Multilingual v2',
     value: 'eleven_multilingual_v2',
     badge: t('features.tts.config.modelBadgeStudio'),
     description: t('features.tts.config.modelMultilingualV2Desc'),
-    tags: ['中文', '日语', '英文'],
+    tags: ['中文', '日语', '英文', '韩语', '南亚语种'],
   },
   {
     label: 'Eleven Flash v2.5',

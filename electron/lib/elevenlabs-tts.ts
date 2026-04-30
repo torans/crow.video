@@ -169,7 +169,7 @@ ScriptType: v4.00+
 
 [V4+ Styles]
 Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding
-Style: Default,Arial,${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,5,60,60,60,1
+Style: Default,Arial,${fontSize},&H00FFFFFF,&H000000FF,&H00000000,&H00000000,0,0,0,0,100,100,0,0,1,2,2,2,60,60,${marginFromBottom},1
 
 [Events]
 Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
@@ -181,15 +181,14 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
     let lastEndMs = 0
 
     const flush = () => {
-      const text = buffer.trim()
+      const text = buffer.replace(/[。！？!?；;：:，,、.\n\r\t\"\'\(\)（）【】「」《》]/g, '').trim()
       if (!text || sentenceStartMs === null) {
         buffer = ''
         sentenceStartMs = null
         return
       }
-      const styledText = `{\\pos(${posX},${posY})\\fs${fontSize}\\c&H00FFFFFF\\3c&H000000\\4a&H00}${text.replace(/\n/g, '\\N')}`
       dialogues.push(
-        `Dialogue: 0,${formatTimestamp(sentenceStartMs)},${formatTimestamp(Math.max(lastEndMs, sentenceStartMs + 300))},Default,,0,0,0,,${styledText}`,
+        `Dialogue: 0,${formatTimestamp(sentenceStartMs)},${formatTimestamp(Math.max(lastEndMs, sentenceStartMs + 300))},Default,,0,0,0,,${text.replace(/\n/g, '\\N')}`,
       )
       buffer = ''
       sentenceStartMs = null
@@ -211,7 +210,7 @@ Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text
       buffer += char
       lastEndMs = end
 
-      if (/[。！？!?；;,\n]/.test(char) || buffer.length >= 14) {
+      if (/[。！？!?；;：:，,、.\n\r\t\"\'\(\)（）【】「」《》]/.test(char) || buffer.replace(/[。！？!?；;：:，,、.\n\r\t\"\'\(\)（）【】「」《》]/g, '').length >= 14) {
         flush()
       }
     }
