@@ -96,7 +96,6 @@ export function buildScriptSystemPrompt(params: {
 }
 
 export function buildScriptUserPrompt(
-  product?: ProductPromptContext | null,
   batchCount: number = 1,
 ): string {
   let prompt = '请为该产品编写一段极具带货力、文感自然、高级的口播文案。'

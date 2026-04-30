@@ -149,8 +149,6 @@ class SynthesisResultImpl implements SynthesisResult {
       return ''
     }
 
-    const posY = playResY - marginFromBottom
-    const posX = Math.round(playResX / 2)
     const formatTimestamp = (ms: number): string => {
       const safeMs = Math.max(0, Math.floor(ms))
       const totalSeconds = Math.floor(safeMs / 1000)

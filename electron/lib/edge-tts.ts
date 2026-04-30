@@ -389,9 +389,6 @@ class SynthesisResultImpl implements SynthesisResult {
     }
 
     // 计算居中、距底部 marginFromBottom 的 Y 坐标
-    const posY = playResY - marginFromBottom
-    const posX = Math.round(playResX / 2) // 水平居中
-
     const assHeader = `[Script Info]
 Title: Generated Subtitles
 PlayResX: ${playResX}

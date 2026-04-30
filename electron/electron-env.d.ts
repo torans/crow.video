@@ -65,6 +65,7 @@ interface Window {
     // LLM 音视频同步匹配
     vlMatchByLLM: (params: {
       subtitleFile: string
+      originalScript?: string
       videoAssets: string[]
       targetDuration?: number
       productInfo?: { name?: string; features?: string; highlights?: string; targetAudience?: string }

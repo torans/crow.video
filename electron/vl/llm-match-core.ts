@@ -344,10 +344,6 @@ export function rankCandidatesForSentence(
 ): number[] {
   const sentenceDuration = requiredDuration || sentence.end - sentence.start
   const keywords = extractKeywords(sentence.text)
-  const productKeywords = extractKeywords(
-    [productInfo?.name || '', productInfo?.features || '', productInfo?.highlights || ''].join(' '),
-  )
-
   return candidates
     .map((candidate, index) => {
       const searchable = `${candidate.description} ${candidate.tags.join(' ')} ${candidate.colors.join(' ')}`.toLowerCase()
