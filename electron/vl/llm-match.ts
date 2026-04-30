@@ -84,7 +84,9 @@ export async function fetchTopKCandidates(
 
   if (records.length === 0) return []
 
-  const allKeywords = buildLlmCandidateKeywordPool(sentences, productInfo)
+  // 粗筛阶段直接基于传入的 sentences 进行关键词提取
+  // 如果是跨语言环境，外部已经完成了对 sentences 的翻译对齐
+  const searchKeywords = buildLlmCandidateKeywordPool(sentences, productInfo)
 
   const scored = records.map((record) => {
     let tags: string[] = []
@@ -99,7 +101,7 @@ export async function fetchTopKCandidates(
         tags,
         colors,
       },
-      allKeywords,
+      searchKeywords,
       productInfo,
     )
 
@@ -323,12 +325,13 @@ export async function matchVideoSegmentsByLLM(params: {
       const tag = tagMatch ? tagMatch[1] : ''
       
       let stage: SegmentStage = 'content'
-      if (tag.includes('吸睛')) stage = 'hook'
-      else if (tag.includes('场景')) stage = 'scene'
-      else if (tag.includes('产品')) stage = 'product'
-      else if (tag.includes('细节')) stage = 'detail'
-      else if (tag.includes('效果')) stage = 'result'
-      else if (tag.includes('转化')) stage = 'cta'
+      const lowTag = tag.toLowerCase()
+      if (tag.includes('吸睛') || lowTag.includes('hook')) stage = 'hook'
+      else if (tag.includes('场景') || lowTag.includes('scene')) stage = 'scene'
+      else if (tag.includes('产品') || lowTag.includes('product')) stage = 'product'
+      else if (tag.includes('细节') || lowTag.includes('detail')) stage = 'detail'
+      else if (tag.includes('效果') || lowTag.includes('result')) stage = 'result'
+      else if (tag.includes('转化') || lowTag.includes('cta')) stage = 'cta'
       
       return { ...sentence, index, stage }
     })
@@ -337,7 +340,44 @@ export async function matchVideoSegmentsByLLM(params: {
     sentences = applyVisualStagePlan(classifySentenceStages(assSentences))
   }
 
-  const baseCandidates = await fetchTopKCandidates(sentences, videoAssets, productInfo, 80)
+  // --- 跨语言匹配补丁：语义对齐 ---
+  let matchingSentences = sentences
+  const isMultilingual = sentences.every(s => !/[\u4e00-\u9fa5]/.test(s.text))
+  
+  if (isMultilingual && sentences.length > 0) {
+    try {
+      console.log('[llm-match] 正在进行语义对齐翻译...')
+      const translatePrompt = `你是一个翻译专家。请将以下短视频脚本逐句翻译成中文，保持原意。
+返回纯 JSON 数组格式: ["翻译1", "翻译2", ...]
+脚本内容:
+${sentences.map(s => s.text).join('\n')}`
+
+      const transRes = await axios.post(
+        `${llmConfig.apiUrl.replace(/\/+$/, '')}/chat/completions`,
+        {
+          model: llmConfig.modelName,
+          messages: [{ role: 'user', content: translatePrompt }],
+          temperature: 0.3,
+        },
+        { headers: { Authorization: `Bearer ${llmConfig.apiKey}` }, timeout: 15000 }
+      )
+      
+      const transContent = transRes.data?.choices?.[0]?.message?.content || ''
+      const transJsonMatch = transContent.match(/\[.*\]/s)
+      if (transJsonMatch) {
+        const translatedTexts = JSON.parse(transJsonMatch[0])
+        matchingSentences = sentences.map((s, i) => ({
+          ...s,
+          text: translatedTexts[i] || s.text
+        }))
+        console.log('[llm-match] 语义对齐完成:', matchingSentences.map(s => s.text))
+      }
+    } catch (e) {
+      console.error('[llm-match] 语义对齐翻译失败:', e)
+    }
+  }
+
+  const baseCandidates = await fetchTopKCandidates(matchingSentences, videoAssets, productInfo, 80)
 
   const uniqueVideos = [...new Set(baseCandidates.map((candidate) => candidate.videoPath))]
   const videoDurations = new Map<string, number>()
@@ -348,8 +388,8 @@ export async function matchVideoSegmentsByLLM(params: {
   )
 
   const candidates = buildStageAwareCandidateList(baseCandidates, videoDurations)
-  const llmResult = await callLLMMatch(sentences, candidates, llmConfig, productInfo)
-  const assembled = assembleSegments(sentences, llmResult, candidates, productInfo, targetDuration)
+  const llmResult = await callLLMMatch(matchingSentences, candidates, llmConfig, productInfo)
+  const assembled = assembleSegments(matchingSentences, llmResult, candidates, productInfo, targetDuration)
 
   const totalDuration = assembled.timeRanges.reduce(
     (sum, [start, end]) => sum + (Number.parseFloat(end) - Number.parseFloat(start)),

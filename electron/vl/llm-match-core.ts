@@ -39,13 +39,13 @@ export interface ProductInfo {
 }
 
 const STAGE_KEYWORDS: Record<SegmentStage, string[]> = {
-  hook: ['吸睛', '瞬间', '动态', '冲击', '爆发', '反差', '对比', '预览', '高光', '关键', '根本', '核心', '认知'],
-  content: ['参数', '数据', '顺滑', '体验', '性能', '材质', '工艺', '韧性', '耐磨', '做工', '精度', '重量', '密度'],
-  product: ['产品', '整体', '全貌', '主体', '轮廓', '外观', '鱼线', 'PE线', '鱼竿', '渔轮', '线杯', '路亚'],
-  detail: ['细节', '特写', '接口', '纹理', '做工', '材质', '表面', '边缘', '厚度', '线径', '编织', '涂层', '结节'],
-  scene: ['场景', '户外', '实战', '使用', '演示', '操作', '测试', '环境', '现场', '水面', '路面', '场地', '抛投', '中鱼', '拉力'],
-  result: ['效果', '结果', '对比', '改善', '变化', '反馈', '稳定', '持久'],
-  cta: ['转化', '尝试', '体验', '现在', '习惯', '记住', '值得', '试试'],
+  hook: ['吸睛', '瞬间', '动态', '冲击', '爆发', '反差', '对比', '预览', '高光', '关键', '根本', '核心', '认知', 'hook', 'impact', 'dynamic', 'shock', 'highlight', 'wow'],
+  content: ['参数', '数据', '顺滑', '体验', '性能', '材质', '工艺', '韧性', '耐磨', '做工', '精度', '重量', '密度', 'smooth', 'performance', 'material', 'quality', 'detail'],
+  product: ['产品', '整体', '全貌', '主体', '轮廓', '外观', '鱼线', 'PE线', '鱼竿', '渔轮', '线杯', '路亚', 'product', 'item', 'gear', 'tackle', 'fishing line', 'rod', 'reel'],
+  detail: ['细节', '特写', '接口', '纹理', '做工', '材质', '表面', '边缘', '厚度', '线径', '编织', '涂层', '结节', 'detail', 'closeup', 'texture', 'texture', 'structure'],
+  scene: ['场景', '户外', '实战', '使用', '演示', '操作', '测试', '环境', '现场', '水面', '路面', '场地', '抛投', '中鱼', '拉力', 'outdoor', 'action', 'fishing', 'using', 'demo', 'test'],
+  result: ['效果', '结果', '对比', '改善', '变化', '反馈', '稳定', '持久', 'result', 'effect', 'feedback', 'stable'],
+  cta: ['转化', '尝试', '体验', '现在', '习惯', '记住', '值得', '试试', 'cta', 'order', 'buy', 'now', 'try', 'get'],
 }
 
 const CTA_HINTS = [
@@ -259,9 +259,10 @@ export function buildLlmCandidateKeywordPool(
     ].join(' '),
   ).forEach((keyword) => allKeywords.add(keyword))
 
-  ;['核心', '瞬间', '特写', '细节', '场景', '户外', '展示', '体验', '产品', '效果', '结果'].forEach((keyword) =>
-    allKeywords.add(keyword),
-  )
+  // 注入所有分镜关键词，确保跨语言环境下粗筛能捞到基础素材
+  Object.values(STAGE_KEYWORDS).forEach(keywords => {
+    keywords.forEach(keyword => allKeywords.add(keyword))
+  })
 
   return allKeywords
 }
@@ -282,15 +283,23 @@ export function scoreCandidateForLlmPool(
   // 2. 产品名称与颜色强匹配 (核心逻辑)
   const COLOR_KEYWORDS = ['红', '蓝', '绿', '黑', '白', '黄', '橙', '紫', '金', '银', '青']
   
-  if (productInfo?.name || productInfo?.description) {
-    const fullProductText = `${productInfo.name || ''} ${productInfo.description || ''}`.toLowerCase()
+  if (productInfo?.name || productInfo?.features || productInfo?.highlights) {
+    const fullProductText = `${productInfo.name || ''} ${productInfo.features || ''} ${productInfo.highlights || ''}`.toLowerCase()
     const productName = (productInfo.name || '').toLowerCase()
     
     // 2.1 名称匹配
     if (productName && searchable.includes(productName)) {
       relevance += 100 
     } else if (productName) {
-      const subWords = productName.split(/[\s,，、]+/).filter(w => w.length > 1)
+      // 更加积极的拆分词：除了空格，还尝试提取 2 字以上的中文词
+      const subWords = new Set<string>()
+      productName.split(/[\s,，、._/-]+/).forEach(w => {
+        if (w.length > 1) subWords.add(w)
+      })
+      // 提取中文词块 (匹配 2 个及以上连续中文)
+      const cnMatches = productName.match(/[\u4e00-\u9fa5]{2,}/g) || []
+      cnMatches.forEach(w => subWords.add(w))
+      
       subWords.forEach(word => {
         if (searchable.includes(word)) relevance += 40
       })
@@ -344,15 +353,44 @@ export function rankCandidatesForSentence(
       const searchable = `${candidate.description} ${candidate.tags.join(' ')} ${candidate.colors.join(' ')}`.toLowerCase()
       let score = candidate.relevance
 
+      // 1. 基础阶段评分
       const stageHints = inferCandidateStageHints(candidate)
       score += getStageMatchScore(sentence.stage, stageHints)
-
+      
+      // 2. 关键词匹配评分
       keywords.forEach((keyword) => {
         if (searchable.includes(keyword.toLowerCase())) score += 8
       })
-      productKeywords.forEach((keyword) => {
-        if (searchable.includes(keyword.toLowerCase())) score += 3
-      })
+      
+      // 3. 产品名称与颜色一致性评分 (同步 fetch 阶段的强力算法)
+      const COLOR_KEYWORDS = ['红', '蓝', '绿', '黑', '白', '黄', '橙', '紫', '金', '银', '青']
+      if (productInfo?.name || productInfo?.features || productInfo?.highlights) {
+        const fullProductText = `${productInfo.name || ''} ${productInfo.features || ''} ${productInfo.highlights || ''}`.toLowerCase()
+        const productName = (productInfo.name || '').toLowerCase()
+        
+        // 3.1 名称匹配奖励
+        if (productName && searchable.includes(productName)) {
+          score += 100 
+        } else if (productName) {
+          const subWords = new Set<string>()
+          productName.split(/[\s,，、._/-]+/).forEach(w => { if (w.length > 1) subWords.add(w) })
+          const cnMatches = productName.match(/[\u4e00-\u9fa5]{2,}/g) || []
+          cnMatches.forEach(w => subWords.add(w))
+          subWords.forEach(word => {
+            if (searchable.includes(word)) score += 40
+          })
+        }
+
+        // 3.2 颜色一致性审计
+        COLOR_KEYWORDS.forEach(color => {
+          const hasColorInProduct = fullProductText.includes(color)
+          const hasColorInVideo = searchable.includes(color)
+          if (hasColorInProduct && hasColorInVideo) score += 60 
+          else if (hasColorInProduct && !hasColorInVideo && COLOR_KEYWORDS.some(c => c !== color && searchable.includes(c))) {
+            score -= 80 
+          }
+        })
+      }
 
       const available = candidate.availableDuration || 0
       if (available >= sentenceDuration) score += 15
